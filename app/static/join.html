@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Join · Secrets</title>
+<link rel="stylesheet" href="/static/fonts.css">
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--bad:#dc2626}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--card:#171e27;--ink:#e8ecf1;--mute:#93a0b1;--line:#27313d;--acc:#5b8cff;--ok:#34d399;--bad:#f87171}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,"Noto Sans Thai",system-ui,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live{width:10px;height:10px;border-radius:50%;background:var(--mute)}.live.on{background:var(--ok);animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.35}}
+.mute{color:var(--mute);font-size:14px}
+main{flex:1;min-height:0;display:flex;flex-direction:column;max-width:820px;width:100%;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+input{font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);margin:10px 0}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;border-radius:10px;cursor:pointer}
+button.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.lvl{display:inline-block;width:60px;height:8px;border-radius:4px;background:var(--line);vertical-align:middle;margin-left:8px;overflow:hidden}.lvl i{display:block;height:100%;width:0;background:var(--ok)}
+button.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);width:100%}
+#caps{flex:1;min-height:0;overflow:auto;padding:4px 2px 16px;line-height:1.7}
+#caps p{margin:0 0 12px}
+#caps p.partial{opacity:.55;font-style:italic}
+#caps .who{display:inline-block;font-size:.62em;color:#fff;background:var(--acc);padding:0 8px;border-radius:99px;margin-right:8px;vertical-align:.2em}
+#caps .ovl{color:var(--acc);font-weight:700;margin-right:6px;cursor:help}
+#caps .t{color:var(--mute);font-size:.6em;margin-right:8px;font-variant-numeric:tabular-nums}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0}
+.hide{display:none!important}
+.bot{border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;background:var(--card);padding:10px 12px;margin:0 0 12px;font-size:.8em}
+.bot .k{font-size:11px;color:#fff;background:var(--acc);border-radius:99px;padding:0 8px;margin-right:6px;text-transform:uppercase}.bot .tx{white-space:pre-wrap}.bot .src{font-size:12px;color:var(--mute)}
+.ask{display:flex;gap:8px;padding:8px 0}.ask input{margin:0;flex:1}
+.msg{padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card);margin-top:12px}
+.msg.err{border-color:var(--bad)}
+#qrBox{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px}
+#qrBox .card{text-align:center;width:min(420px,100%)}
+#qrBox img{width:100%;max-width:340px;aspect-ratio:1;background:#fff;border-radius:10px;padding:6px;display:block;margin:10px auto}
+#qrBox .link{font-size:13px;color:var(--mute);overflow-wrap:anywhere;margin:4px 0 12px}
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+<header><span class="live" id="live"></span><h1 id="title">Secrets</h1><span class="mute" id="count"></span></header>
+<main>
+  <div id="join" class="card">
+    <h2 style="margin:0 0 4px;font-size:20px">Join the meeting · เข้าร่วมประชุม</h2>
+    <p class="mute" style="margin:0 0 6px">You will see the live transcript on this device. Your microphone is <b>not</b> used unless you tap 🎤 after joining: then your voice is recorded with the meeting, so your words are transcribed clearly under your name.</p>
+    <input id="name" maxlength="40" placeholder="Your name · ชื่อของคุณ" autocomplete="name">
+    <button class="pri" id="go">Join · เข้าร่วม</button>
+    <p class="mute" style="margin-bottom:0">Your name is shown to the host. Captions are automatic and can contain mistakes.</p>
+    <div class="msg err hide" id="err"></div>
+    <button id="share2" style="width:100%;margin-top:12px">▦ Show QR code for others · แสดง QR ให้ผู้อื่นสแกน</button>
+  </div>
+  <div id="view" class="hide" style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <div class="bar"><span class="mute" id="status">Connecting…</span><span style="flex:1"></span>
+      <button id="mic" class="hide" title="Send your own microphone: your words are transcribed clearly under your name, even when others talk at the same time">🎤 Use my microphone</button>
+      <button id="smaller" aria-label="Smaller text">A−</button><button id="bigger" aria-label="Larger text">A+</button><button id="share" title="Show the QR code of this meeting: people next to you scan it to join">▦ QR</button><button id="leave">Leave</button></div>
+    <div id="micInfo" class="msg hide"></div>
+    <div id="caps" aria-live="polite"></div>
+  </div>
+</main>
+<div id="qrBox" class="hide"><div class="card">
+  <h2 style="margin:0;font-size:20px">Scan to join · สแกนเพื่อเข้าร่วม</h2>
+  <div class="mute">Others in the room scan this with their phone camera (same Wi-Fi). · ให้ผู้อื่นสแกนด้วยกล้องโทรศัพท์ (Wi-Fi เดียวกัน)</div>
+  <img id="qrImg" alt="QR code to join this meeting">
+  <div class="link" id="qrLink"></div>
+  <div style="display:flex;gap:8px;justify-content:center"><button id="qrCopy">Copy link · คัดลอกลิงก์</button><button id="qrClose">Close · ปิด</button></div>
+</div></div>
+<script>
+const $ = s => document.querySelector(s);
+const token = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
+let sock, name = "", ended = false, retry = 0, size = 22;
+const COLORS = ["#2f6fed", "#e11d48", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4d7c0f"];
+const hue = t => COLORS[[...String(t)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
+const fmt = s => { s = Math.floor(s); return [s / 3600 | 0, s % 3600 / 60 | 0, s % 60].map(n => String(n).padStart(2, "0")).join(":"); };
+try { $("#name").value = localStorage.getItem("secrets.guestName") || ""; size = +localStorage.getItem("secrets.guestSize") || 22; } catch {}
+$("#caps").style.fontSize = size + "px";
+
+function setPartial(c) {
+  const box = $("#caps"), near = box.scrollHeight - box.scrollTop - box.clientHeight < 120; let p = box.querySelector("p.partial");
+  if (!p) { p = document.createElement("p"); p.className = "partial"; box.append(p); }
+  p.textContent = c.text + " …"; if (near) box.scrollTop = box.scrollHeight;
+}
+function addCap(c) {
+  document.querySelectorAll("#caps p.partial").forEach(e => e.remove());
+  if (c.replaces) document.querySelectorAll("#caps p[data-id]").forEach(e => { if (e.dataset.id === c.replaces) e.remove(); });
+  const box = $("#caps"), near = box.scrollHeight - box.scrollTop - box.clientHeight < 120, p = document.createElement("p");
+  if (c.id) p.dataset.id = c.id;
+  const t = document.createElement("span"); t.className = "t"; t.textContent = fmt(c.t0); p.append(t);
+  if (c.speaker) { const w = document.createElement("span"); w.className = "who"; w.style.background = hue(c.speaker); w.textContent = c.speaker; p.append(w); }
+  if (c.overlap) { const o = document.createElement("span"); o.className = "ovl"; o.textContent = "⇄"; o.title = "Two people talked at once here: this caption may mix their words"; p.append(o); }
+  p.append(document.createTextNode(c.text)); box.append(p);
+  while (box.children.length > 400) box.firstChild.remove();
+  if (near) box.scrollTop = box.scrollHeight;
+}
+let room = false, waitT = null;  // the room link (printed QR): before the meeting starts, wait here and connect when it does
+function waitFor(msg) {
+  room = true; $("#join").classList.add("hide"); $("#view").classList.remove("hide"); $("#view").style.display = "flex"; $("#live").classList.remove("on");
+  $("#status").textContent = "⏳ " + msg; $("#mic").classList.add("hide");
+  if (!$("#caps").firstChild || $("#caps").dataset.waiting) { $("#caps").dataset.waiting = "1"; $("#caps").replaceChildren(Object.assign(document.createElement("p"), { className: "mute", textContent: "Keep this page open: the live transcript appears here as soon as the meeting starts. · เปิดหน้านี้ไว้ ข้อความจะขึ้นเมื่อเริ่มประชุม" })); }
+  clearTimeout(waitT); waitT = setTimeout(() => { if (name) { ended = false; connect(); } }, 3000);
+}
+function fail(msg) { $("#join").classList.remove("hide"); $("#view").classList.add("hide"); const e = $("#err"); e.textContent = msg; e.classList.remove("hide"); $("#live").classList.remove("on"); }
+function connect() {
+  sock = new WebSocket(`wss://${location.host}/ws/join?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}`);
+  sock.onopen = () => { retry = 0; };
+  sock.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === "hello") {
+      $("#join").classList.add("hide"); $("#view").classList.remove("hide"); $("#view").style.display = "flex";
+      $("#title").textContent = m.title || "Meeting"; delete $("#caps").dataset.waiting; $("#caps").replaceChildren(); m.backlog.forEach(addCap); 
+      $("#status").textContent = "Live · listening"; $("#live").classList.add("on"); $("#count").textContent = "Joined: " + m.count;
+      $("#mic").classList.toggle("hide", !m.mic || !(navigator.mediaDevices && window.AudioWorkletNode));
+      if (m.captions === false) { $("#status").textContent = "● Recording (no live captions in this meeting)";
+        $("#caps").replaceChildren(Object.assign(document.createElement("p"), { className: "mute", textContent: m.mic ? "This meeting is recorded and transcribed carefully afterwards, so no text is shown live. Tap 🎤 to add your own microphone: your words will be transcribed clearly under your name. · การประชุมนี้บันทึกเสียงแล้วถอดความภายหลัง แตะ 🎤 เพื่อให้คำพูดของคุณถอดความได้ชัดเจน" : "This meeting is recorded and transcribed carefully afterwards, so no text is shown live." })); }
+      const box = $("#caps"); box.scrollTop = box.scrollHeight;
+    } else if (m.type === "caption") addCap(m);
+    else if (m.type === "partial") setPartial(m);
+    else if (m.type === "info") { $("#status").textContent = m.message; setTimeout(() => { if ($("#live").classList.contains("on")) $("#status").textContent = "Live · listening"; }, 4000); }
+    else if (m.type === "count") $("#count").textContent = "Joined: " + m.n;
+    else if (m.type === "mic") { if (!m.on) { micStop(); micMsg(m.message || "Your microphone is not used.", true); } }
+    else if (m.type === "ended" || m.type === "closed") { ended = true; micStop(); $("#status").textContent = m.type === "ended" ? "The meeting has ended. Thank you!" : "The host closed joining."; $("#live").classList.remove("on");
+      if (room) setTimeout(() => { if (name && !$("#view").classList.contains("hide")) waitFor("Waiting for the next meeting…"); }, 15000); }
+    else if (m.type === "error" && m.code === "waiting") { ended = true; waitFor(m.message); }
+    else if (m.type === "error") { ended = true; fail(m.message); }
+  };
+  sock.onclose = () => {
+    if (ended || !name) return;
+    $("#live").classList.remove("on"); retry++;
+    if (retry > 40) { $("#status").textContent = "Disconnected."; return; }
+    $("#status").textContent = `Connection lost. Reconnecting (${retry})…`; setTimeout(connect, Math.min(5000, 800 * retry));
+  };
+}
+$("#go").onclick = () => {
+  name = $("#name").value.trim(); if (!name) { fail("Please type your name."); return; }
+  try { localStorage.setItem("secrets.guestName", name); } catch {}
+  $("#err").classList.add("hide"); ended = false; connect();
+};
+$("#name").onkeydown = e => { if (e.key === "Enter") $("#go").click(); };
+$("#leave").onclick = () => { micStop(); clearTimeout(waitT); ended = true; sock && sock.close(); $("#view").classList.add("hide"); $("#join").classList.remove("hide"); $("#live").classList.remove("on"); $("#title").textContent = "Secrets"; $("#count").textContent = ""; };
+/* ---------- my own microphone (optional) ---------- */
+let mic = null;  // { stream, ctx, node, buf, n, lock }
+function micMsg(t, bad) { const e = $("#micInfo"); e.classList.toggle("hide", !t); e.classList.toggle("err", !!bad); e.replaceChildren(); if (t) e.append(t); }
+async function micStart() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const ctx = new AudioContext(); await ctx.resume(); await ctx.audioWorklet.addModule("/static/pcm-worklet.js");
+    const node = new AudioWorkletNode(ctx, "pcm-downsampler"); ctx.createMediaStreamSource(stream).connect(node);
+    mic = { stream, ctx, node, buf: new Int16Array(1600), n: 0, lock: null };
+    node.port.onmessage = e => {  // 20 ms frames -> 100 ms messages
+      const f = new Int16Array(e.data); mic.buf.set(f, mic.n); mic.n += f.length;
+      if (mic.n >= mic.buf.length) {
+        let pk = 0; for (const v of mic.buf) pk = Math.max(pk, Math.abs(v));
+        const bar = document.querySelector("#micInfo .lvl i"); if (bar) bar.style.width = Math.min(100, pk / 200) + "%";
+        if (sock && sock.readyState === 1) sock.send(mic.buf.slice(0, mic.n).buffer);
+        mic.n = 0;
+      }
+    };
+    try { mic.lock = await navigator.wakeLock.request("screen"); } catch {}
+    $("#mic").textContent = "🎤 Stop my microphone"; $("#mic").classList.add("on");
+    const info = document.createElement("span"); info.textContent = "Your microphone is on: your words go into the meeting transcript under your name. Keep this page open and the phone near you.";
+    const lvl = document.createElement("span"); lvl.className = "lvl"; lvl.append(document.createElement("i")); info.append(lvl);
+    micMsg(info, false);
+  } catch (e) { micStop(); micMsg("The microphone could not be used: " + (e.message || e) + ". Allow microphone access for this page in the browser.", true); }
+}
+function micStop() {
+  if (!mic) return;
+  try { mic.stream.getTracks().forEach(t => t.stop()); mic.ctx.close(); if (mic.lock) mic.lock.release(); } catch {}
+  mic = null; $("#mic").textContent = "🎤 Use my microphone"; $("#mic").classList.remove("on"); micMsg("");
+}
+$("#mic").onclick = () => mic ? micStop() : micStart();
+/* ---------- QR code of this join link, for the people next to me ---------- */
+function qrOpen() {
+  const img = $("#qrImg"); img.onerror = () => { img.replaceWith(Object.assign(document.createElement("p"), { id: "qrImg", className: "mute", textContent: "This link is not open for joining right now." })); };
+  if (img.tagName === "IMG") img.src = location.pathname.replace(/\/$/, "") + "/qr.svg?t=" + Date.now();
+  $("#qrLink").textContent = location.origin + location.pathname; $("#qrBox").classList.remove("hide");
+}
+$("#share").onclick = $("#share2").onclick = qrOpen;
+$("#qrClose").onclick = () => $("#qrBox").classList.add("hide");
+$("#qrBox").onclick = e => { if (e.target.id === "qrBox") $("#qrBox").classList.add("hide"); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("#qrBox").classList.add("hide"); });
+$("#qrCopy").onclick = async () => { try { await navigator.clipboard.writeText(location.origin + location.pathname); $("#qrCopy").textContent = "Copied ✓"; } catch { prompt("Copy this link", location.origin + location.pathname); } };
+const resize = d => { size = Math.max(14, Math.min(48, size + d)); $("#caps").style.fontSize = size + "px"; try { localStorage.setItem("secrets.guestSize", size); } catch {} };
+$("#bigger").onclick = () => resize(3); $("#smaller").onclick = () => resize(-3);
+</script>
+</body>
+</html>

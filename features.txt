@@ -1,0 +1,146 @@
+ZECRET — FEATURE SUMMARY
+
+
+
+1. MEETINGS AND TRANSCRIPTION
+- Record meetings with live captions and retained local audio.
+- Thai/English transcription with configurable caption engines and
+device selection.
+- Optional Whisper accurate pass and guarded AI context corrections.
+- End meeting to process, or cancel to stop without starting processing.
+- Meeting list, search, sorting, transcript playback, speaker
+identification,
+   participation statistics, AI notes and Markdown export.
+- Optional display of CPU, NPU, GPU, RAM and disk storage information.
+- Responsive pages and wider meeting, voice and vocabulary tables.
+
+2. TRANSCRIPT REVIEW AND FEEDBACK
+- Review & improve section inside each meeting.
+- Replay audio, correct text and retain original wording plus correction
+history.
+- Undo the latest text change; reject stale edits from another tab.
+- Reviewed lines are protected from accurate/context passes; full
+retranscription
+   is blocked when it would erase review history.
+- Regenerate notes explicitly from the corrected transcript.
+- Suggest short Thai/English terms and transliterations for a business
+domain.
+- Suggestions are disabled until an administrator reviews and enables them.
+- Corrections are meeting-specific, not automatic global replacements.
+- No automatic speech-model training or measured accuracy improvement is
+claimed.
+
+3. VOCABULARY WORKSPACE
+- Separate management of business domains, context, keywords and aliases.
+- Thai, English and transliteration fields, with search and filtering.
+- Append/import vocabulary with UTF-8, file-size, format and entry
+validation.
+- Revision checks protect against stale dictionary edits.
+- Insurance vocabulary, including law, acts, brokers and Thailand's OIC.
+- Added 100 corporate-meeting terms and 100 business-services terms.
+- Enabled entries guide transcription/context within model hint limits.
+- Compact single-line table rows with horizontal scrolling where needed.
+- Shared vocabulary management is restricted to administrators under RBAC.
+
+4. VOICE LIBRARY AND MANUAL ENROLLMENT
+- Separate Enroll voice and Voice library pages.
+- Record or upload samples; preview before enrollment.
+- Manage names, samples, notes and playback of retained samples.
+- Add samples to an existing person; replacement requires explicit action.
+- Quality checks for sufficient speech, consistency and multiple voices.
+- Local voiceprints and up to 40 seconds of sample speech retained for
+playback.
+- Remembering a meeting speaker's voice is opt-in with participant consent.
+- Shared voice-library management is administrator-controlled.
+
+5. EXPERIMENTAL HANDS-FREE ENROLLMENT
+- Optional Thai/English spoken guidance using an installed local speech
+voice.
+- Browser Start and microphone permission are required; not an always-on
+service.
+- Combined wake/command support, e.g. "Hey Zecret, enroll my voice".
+- Thai command variations, polite endings, command retries and pause
+detection.
+- Microphone gain, prompt volume and wake-sensitivity controls.
+- Sensitivity percentages represent presets, not calibrated recognition
+accuracy.
+- New flow: consent -> speak -> automatic quality stop -> ask name ->
+confirm/save.
+- Quality checks begin around 22 seconds and repeat about every 5 seconds.
+- Target: at least 20 seconds of detected speech, voice consistency >= 0.75,
+   and passing single-voice analysis. Capture is capped at 40 seconds.
+- Quality consistency is NOT a guaranteed recognition-accuracy percentage.
+- After passing, ask naturally in Thai: "ขอทราบชื่อของคุณด้วยครับ".
+- Introduce yourself with "ผมชื่อ ..." or "ฉันชื่อ ..." and confirm the name.
+- No Stop command is needed to finish sample capture.
+- Failed checks, cancellation or unconfirmed names do not save a sample.
+- Name/confirmation clips are excluded from the enrolled voice sample.
+- On-screen status and spoken completion feedback; no camera/face/pose
+detection.
+- Capture/decoding gaps remain; real microphone performance needs user
+testing.
+
+6. AI SUMMARY EDITING
+- Meeting owner can edit and save an existing summary.
+- Server checks ownership and blocks stale saves.
+- Author, timestamp, before and after text are retained in
+summary-history.json.
+- Regenerating AI notes may replace manually edited summary text.
+- Notes instructions require evidence for owners/deadlines and
+unspecified labels
+   when unsupported. Generated notes still require human review.
+- Email delivery is NOT configured or implemented as part of this work.
+
+7. ACCOUNTS AND ROLE-BASED ACCESS
+- Local sign-in with Admin, Member and Viewer roles.
+- All signed-in users can view meetings; there is no per-meeting
+read-sharing ACL.
+- Members/Admins can create meetings; new meetings belong to their creator.
+- Only the owner, with a Member/Admin role, can edit, delete, resume
+recording,
+   process or save the meeting summary. Another Admin cannot override
+ownership.
+- Viewers are read-only, including for meetings they may formerly have
+owned.
+- Admin manages accounts, roles, enabled states and shared
+settings/services.
+- Existing meetings stay unowned/read-only until Admin assigns an
+eligible owner.
+- Assignment does not allow later reassignment of already-owned meetings.
+- Server enforcement covers HTTP writes and recording WebSockets.
+- Cookie sessions expire after eight hours; logout/permission changes
+revoke them.
+- Password hashing, login throttling and CSRF protection; no default
+credentials.
+- Passwords require at least 12 characters.
+- Remote sign-in requires HTTPS; loopback HTTP is allowed on this computer.
+- Bulk cross-meeting text reapply/voice rematch are blocked under
+ownership rules.
+- This is local RBAC, prepare for enterprise SSO (dummy page first).
+
+8. SIGN-IN DESIGN
+- Modern two-panel Zecret layout with responsive mobile presentation.
+- Light/dark theme support and reduced navigation clutter before sign-in.
+- Show/hide password, Caps Lock warning, loading state and clear error
+messages.
+- First-administrator setup guidance shown when no accounts exist.
+- People talking at the same time: overlapping speech is detected (pyannote segmentation), left out when learning voices, and separated (Conv-TasNet) so each person gets their own line, marked ⇄ with the mixed text kept (Settings -> Participants, on by default). Overlapped-part error rate 47.7% -> 20.6% in tests.
+- PERFORMANCE.md: models and measured speed/accuracy for every activity.
+- No words lost when people talk at once: short remarks said over someone are added as their own line (⇄+), quieter second voices kept when
+  they are clearly another person, words heard only in the mixed sound shown as "Also heard"; "⇄ Check these lines" filter. Live captions with
+  two voices are marked ⇄ (host, phones, Live tab).
+- Participants' own microphones: on the join page a participant taps 🎤; their phone's audio is kept with the meeting, captioned live under
+  their name (the room's copy of the same words is hidden) and, after the meeting, aligned to the room recording so their lines come from their
+  phone while other people's words said at the same time stay. Settings -> Join (on by default). Tests: overlapped part A 36.7% -> 9.6%,
+  B 38.0% -> 15.8%.
+- Best transcript after the meeting: three Thai models (Pathumma Whisper Large, Pathumma Whisper medium, Pathumma FastConformer) transcribe
+  every line and the text two of them agree on is kept (5.25% errors vs 6.65% before; about 4-5 h for a 1-hour meeting; the summary follows).
+  Lines where they disagree show the other models' versions: one click puts one in the line (Transcript and Review tabs, "Models disagree"
+  filter). Recording without live captions is the default (Record only).
+- Processing window: meetings are transcribed and summarized after working hours (default 18:00-06:00 and all weekend; an administrator sets
+  it in Settings -> Transcription). If the window closes mid-way the work stops at a checkpoint and continues the next evening. An
+  administrator can press "Process now" on any waiting meeting.
+- Expected ready time for every meeting: the Meetings list shows a "Processing queue" card and each waiting meeting's badge says when it
+  starts and when it will be ready (transcript, who said what, summary step by step), estimated from this box's past meetings.
+- Participants can pass the meeting on: the join page has a "▦ QR" button that shows the meeting's QR code full screen, so the people next to
+  them scan it from their phone and join too (with a Copy link button).

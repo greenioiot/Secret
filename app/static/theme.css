@@ -1,0 +1,5 @@
+/* Colour themes, chosen per account (My account) and kept in localStorage "secrets_theme" so pages paint in it at once.
+   No data-theme = follow the device (light/dark). "gray" is offered to administrators only. Loaded after each page's own <style>. */
+:root[data-theme=light]{color-scheme:light;--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--acc2:#7c3aed;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--rec:#e11d48;--field:#f8f9fb}
+:root[data-theme=dark]{color-scheme:dark;--bg:#0f1419;--card:#171e27;--ink:#e8ecf1;--mute:#93a0b1;--line:#27313d;--acc:#5b8cff;--acc-ink:#fff;--acc2:#a78bfa;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;--rec:#fb7185;--field:#10161d}
+:root[data-theme=gray]{color-scheme:light;--bg:#c9ccd1;--card:#dfe1e5;--ink:#1b1f24;--mute:#4a515c;--line:#b3b8c0;--acc:#3a56c4;--acc-ink:#fff;--acc2:#6d3fc9;--ok:#13773a;--warn:#9a5b06;--bad:#b42318;--rec:#c8143f;--field:#d4d7dc}

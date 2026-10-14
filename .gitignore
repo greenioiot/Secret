@@ -1,0 +1,17 @@
+# runtime data: meetings, audio, users, sessions, settings, logs (never in git)
+data/
+# python environments
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+# models (26 GB; downloaded or converted, see README)
+models/
+# TLS keys
+app/certs/
+# backups kept beside edited files, and logs
+*.bak
+*.bak-*
+*.log
+*.log.old
+*.tgz

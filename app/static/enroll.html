@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Enroll your voice · Secrets</title>
+<link rel="stylesheet" href="/static/fonts.css">
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--bad:#dc2626;--rec:#e11d48}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--card:#171e27;--ink:#e8ecf1;--mute:#93a0b1;--line:#27313d;--acc:#5b8cff;--ok:#34d399;--bad:#f87171;--rec:#fb7185}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,"Noto Sans Thai",system-ui,sans-serif}
+header{padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line);font-weight:600}
+main{max-width:640px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+h1{font-size:20px;margin:0 0 6px}
+.mute{color:var(--mute);font-size:14px}
+input[type=text]{font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);margin:6px 0 12px}
+label.c{display:flex;gap:10px;align-items:flex-start;font-size:14px;margin:6px 0 14px}
+label.c input{width:20px;height:20px;margin-top:2px;flex:none}
+button{font:inherit;border:0;padding:14px 18px;border-radius:10px;cursor:pointer;width:100%;font-weight:600;background:var(--rec);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+button.live{background:var(--ink);color:var(--bg)}
+.read{font-size:19px;line-height:1.9;background:var(--bg);border-radius:10px;padding:12px 14px;margin:10px 0}
+.meter{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin:12px 0 4px}.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .15s}
+.msg{padding:12px;border-radius:10px;border:1px solid var(--line);margin-top:12px}.msg.err{border-color:var(--bad)}.msg.ok{border-color:var(--ok)}
+.gcard{border-left:4px solid var(--acc)}
+.gh{display:flex;gap:10px;align-items:center;margin-bottom:8px}.gh .av{width:2.2em;height:2.2em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:700}
+.gl button{font:inherit;font-size:13px;width:auto;padding:4px 10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px}.gl button.on{background:var(--acc);color:#fff}
+#gmsg{font-size:17px;line-height:1.6;min-height:3.2em;white-space:pre-wrap}
+.dots{display:flex;gap:6px;margin:10px 0}.dots i{flex:1;height:6px;border-radius:3px;background:var(--line)}.dots i.on{background:var(--acc)}.dots i.done{background:var(--ok)}
+.gaddr{font:13px/1.4 ui-monospace,Menlo,monospace;background:var(--bg);border-radius:8px;padding:8px 10px;word-break:break-all;margin:6px 0}
+.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.gchips button{font:inherit;font-size:13px;width:auto;padding:4px 10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:99px;font-weight:400}
+.gask{display:flex;gap:8px}.gask input{margin:0;flex:1}.gask button{width:auto;background:var(--acc)}
+#ganswer{margin-top:8px;font-size:15px;white-space:pre-wrap}
+#cancel{background:none!important;color:var(--mute)!important;font-weight:400;text-decoration:underline;margin-top:8px;padding:6px}
+.hide{display:none!important}
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+<header>Secrets · Voice enrolment</header>
+<main>
+  <div id="guide" class="card gcard">
+    <div class="gh"><div class="av" id="gav">?</div><b id="gname">…</b><span style="flex:1"></span><span class="gl"><button data-l="th">ไทย</button> <button data-l="en">EN</button></span></div>
+    <div id="gmsg"></div><div class="dots" id="gdots"></div>
+    <details style="margin:6px 0"><summary class="mute" style="cursor:pointer" id="gaddrsum">Address</summary><div class="gaddr" id="gaddr"></div></details>
+    <div class="gchips" id="gchips"></div>
+    <div class="gask"><input id="gq" maxlength="300" placeholder="Ask the guide… · ถามผู้ช่วย"><button id="gask">Ask</button></div>
+    <div id="ganswer"></div>
+  </div>
+  <div id="form" class="card">
+    <h1>Enroll your voice · ลงทะเบียนเสียงของคุณ</h1>
+    <p class="mute" style="margin-top:0">So Secrets can put your name on what you say in meetings. It takes about 30 seconds.</p>
+    <label for="name" class="mute" style="font-size:14px">Your name · ชื่อของคุณ</label>
+    <input type="text" id="name" maxlength="40" autocomplete="name" placeholder="e.g. สมชาย">
+    <label class="c"><input type="checkbox" id="consent"><span>I agree that Secrets stores a <b>voiceprint</b> (a numeric description of my voice) on this device so it can recognise me in meeting recordings. The host reviews it before it is used. My recording is <b>not</b> saved, only the voiceprint, and I can ask the host to delete it at any time.<br>
+      <span class="mute">ฉันยินยอมให้เก็บ “ลายเสียง” (ค่าตัวเลขที่อธิบายเสียงของฉัน) ไว้ในเครื่องนี้เพื่อใช้ระบุตัวฉันในการประชุม โดยเจ้าของห้องประชุมจะตรวจสอบก่อนใช้งาน ไม่มีการเก็บไฟล์เสียงของฉัน และฉันขอให้ลบได้ทุกเมื่อ</span></span></label>
+    <div class="mute">When you press Start, read this aloud in your normal voice, close to the phone, in a quiet place:</div>
+    <div class="read" id="text"></div>
+    <button id="go">Start recording · เริ่มอัดเสียง</button><button id="cancel" class="hide">Cancel · ยกเลิก</button>
+    <div class="meter"><i id="meter"></i></div><div class="mute" id="status"></div>
+    <div class="msg err hide" id="err"></div>
+  </div>
+  <div id="done" class="card hide"><h1>Thank you · ขอบคุณ</h1><p>Your voice was sent to the host (<b id="secs"></b> s of speech). It will be used after the host approves it.</p><button id="again" style="background:var(--acc)">Enroll another person</button></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const token = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
+let sock, ctx, stream, node, running = false, finished = false;
+try { $("#name").value = localStorage.getItem("secrets.guestName") || ""; } catch {}
+/* ---------- the guide (explains, coaches, tells the address, answers enrolment questions only) ---------- */
+let G = null, glang = (navigator.language || "").toLowerCase().startsWith("th") ? "th" : "en", gstage = 1, lastCoach = 0, quietN = 0, userLang = false;
+const GT = {
+  th: { hello: n => `สวัสดีครับ ผมคือ${n} จะพาลงทะเบียนเสียงทีละขั้น ใช้เวลาแค่ประมาณ 30 วินาที\nเริ่มจากพิมพ์ชื่อของคุณ แล้วติ๊กช่องยินยอมครับ`, consent: "ดีครับ ต่อไปติ๊กช่องยินยอม เพื่อให้เก็บ “ลายเสียง” (ไม่เก็บไฟล์เสียง)", ready: "พร้อมแล้วครับ กด “เริ่มอัดเสียง” แล้วอ่านข้อความด้านล่างให้ครบ",
+    mic: "เบราว์เซอร์กำลังขอใช้ไมโครโฟน กด “อนุญาต” ได้เลยครับ", rec: "กำลังฟังอยู่ครับ อ่านข้อความด้วยเสียงปกติ ถือโทรศัพท์ห่างปากประมาณ 20–30 ซม.", quiet: "ได้ยินเสียงเบามากครับ ลองขยับเข้าใกล้ไมค์และพูดให้ดังขึ้นอีกนิด", loud: "เสียงดังเกินไปครับ ถอยห่างจากไมค์เล็กน้อย", good: "ดีมากครับ อ่านต่อได้เลย", almost: "ใกล้เสร็จแล้วครับ อ่านให้จบย่อหน้า",
+    enough: "พอแล้วครับ กด “หยุดและส่ง” ได้เลย", sending: "กำลังส่ง รอสักครู่ครับ…", done: "เรียบร้อยครับ ขอบคุณ! เจ้าของห้องจะตรวจและอนุมัติ หลังจากนั้นระบบจะรู้จักเสียงของคุณ ไม่ต้องทำอะไรเพิ่มแล้วครับ", cancelled: "ยกเลิกแล้วครับ พร้อมเมื่อไหร่กดเริ่มอัดเสียงได้เลย",
+    closed: "ลิงก์นี้ปิดแล้ว/หมดอายุครับ ขอให้เจ้าของห้องเปิดลิงก์ใหม่ แล้วสแกน QR ใหม่",
+    short: "เสียงพูดสั้นไปครับ ลองใหม่ในที่เงียบ อ่านข้อความให้ครบทั้งย่อหน้า (ประมาณ 30 วินาที) และดูว่าแถบสีเขียวขยับเมื่อพูด", busy: "ระบบกำลังยุ่งอยู่ครับ รอสักครู่แล้วกดเริ่มอัดเสียงใหม่", full: "มีผู้ลงทะเบียนรอการอนุมัติเยอะแล้วครับ แจ้งเจ้าของห้องให้อนุมัติ แล้วลองใหม่", mic_err: "ใช้ไมโครโฟนไม่ได้ครับ กดอนุญาตไมโครโฟนให้หน้านี้ (แตะไอคอนที่แถบที่อยู่ → ไมโครโฟน → อนุญาต) แล้วลองใหม่",
+    lost: "การเชื่อมต่อหลุดครับ ตรวจว่ายังต่อ Wi-Fi เดียวกัน แล้วลองใหม่", name: "พิมพ์ชื่อของคุณก่อนนะครับ", consent_err: "ติ๊กช่องยินยอมก่อนนะครับ", wait: n => `ต้องมีเสียงพูดอย่างน้อย 10 วินาที อ่านต่ออีก ${n} วินาทีครับ`, addr: (a) => `ถ้าหน้านี้หลุด ให้เปิดที่อยู่ ${a} ในช่องที่อยู่ของเบราว์เซอร์ แล้วสแกน QR ใหม่`, addrSum: "ที่อยู่ของระบบ" },
+  en: { hello: n => `Hello, I am ${n}. I will guide you through voice enrolment step by step; it takes about 30 seconds.\nStart by typing your name, then tick the consent box.`, consent: "Good. Next tick the consent box so a “voiceprint” can be kept (your recording is not saved).", ready: "Ready. Tap “Start recording”, then read the text below to the end.",
+    mic: "Your browser is asking for the microphone: tap “Allow”.", rec: "I am listening. Read in your normal voice, holding the phone 20–30 cm from your mouth.", quiet: "I can hardly hear you. Move closer to the microphone and speak a little louder.", loud: "That is too loud. Move a little away from the microphone.", good: "Very good, keep reading.", almost: "Nearly done. Finish the paragraph.",
+    enough: "That is enough: tap “Stop and send”.", sending: "Sending, one moment…", done: "All done, thank you! The host will check and approve it, and then the system will recognise your voice. Nothing more to do.", cancelled: "Cancelled. Tap “Start recording” when you are ready.",
+    closed: "This link is closed or expired. Ask the host to open a new one and scan the new QR.",
+    short: "That was too short. Try again somewhere quiet, read the whole paragraph (about 30 seconds) and check that the green bar moves when you talk.", busy: "The system is busy. Wait a moment, then tap “Start recording” again.", full: "Many voices are waiting for the host. Ask the host to approve them, then try again.", mic_err: "I cannot use the microphone. Allow it for this page (tap the icon in the address bar → Microphone → Allow) and try again.",
+    lost: "The connection was lost. Check you are still on the same Wi-Fi, then try again.", name: "Please type your name first.", consent_err: "Please tick the consent box first.", wait: n => `I need at least 10 seconds of speech: keep reading for ${n} more seconds.`, addr: a => `If this page gets lost, open ${a} in the browser's address bar and scan the QR again.`, addrSum: "System address" },
+};
+const gsay = (k, ...a) => { const f = GT[glang][k]; $("#gmsg").textContent = typeof f === "function" ? f(...a) : f; };
+function gstep(n, doneUpTo = n - 1) { gstage = n; $("#gdots").replaceChildren(...[1, 2, 3, 4, 5, 6].map(i => { const d = document.createElement("i"); d.className = i <= doneUpTo ? "done" : i === n ? "on" : ""; return d; })); }
+function setGlang(l, user = true) { glang = l; if (user) userLang = true; document.querySelectorAll(".gl button").forEach(b => b.classList.toggle("on", b.dataset.l === l)); $("#gaddrsum").textContent = GT[l].addrSum; renderChips(); const a = (G && G.app_urls[0]) || location.origin + "/"; $("#gaddr").textContent = a; if (G) gsay(gstage === 1 ? "hello" : "ready", G.name); }
+function renderChips() { const box = $("#gchips"); box.replaceChildren(...((G && G.suggest[glang]) || []).slice(0, 4).map(q => { const b = document.createElement("button"); b.textContent = q; b.onclick = () => askGuide(q); return b; })); }
+async function loadGuide() {
+  try { const r = await fetch(`/enroll/${token}/guide`); if (!r.ok) { gsay("closed"); return; } G = await r.json(); if (G.read_text) $("#text").textContent = G.read_text; $("#gname").textContent = G.name; $("#gav").textContent = G.name.slice(0, 1);
+    if (!userLang && G.lang_pref !== "auto") glang = G.lang_pref; setGlang(glang, false); gstep(1, 0); gsay("hello", G.name); const a = G.app_urls[0] || ""; $("#gaddr").textContent = (a ? a + "   " : "") + (G.enroll_urls[0] || ""); } catch { /* the guide is optional: the form still works */ }
+}
+async function askGuide(q) {
+  q = (q || $("#gq").value).trim(); if (!q) return; $("#gq").value = ""; $("#ganswer").textContent = "…";
+  try { const r = await fetch(`/enroll/${token}/ask`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q, lang: userLang || /[\u0e00-\u0e7f]/.test(q) ? undefined : glang }) });
+    if (r.status === 429) { $("#ganswer").textContent = glang === "th" ? "รอสักครู่แล้วถามใหม่นะครับ" : "Please wait a moment, then ask again."; return; }
+    if (!r.ok) { gsay("closed"); $("#ganswer").textContent = ""; return; } const j = await r.json(); $("#ganswer").textContent = j.answer;
+    $("#gchips").replaceChildren(...j.suggestions.map(s => { const b = document.createElement("button"); b.textContent = s; b.onclick = () => askGuide(s); return b; })); } catch { $("#ganswer").textContent = GT[glang].lost; }
+}
+document.querySelectorAll(".gl button").forEach(b => b.onclick = () => setGlang(b.dataset.l));
+$("#gask").onclick = () => askGuide(); $("#gq").onkeydown = e => { if (e.key === "Enter") askGuide(); };
+$("#name").addEventListener("change", () => { if ($("#name").value.trim() && !$("#consent").checked && !running) { gstep(1, 1); gsay("consent"); } });
+$("#consent").addEventListener("change", () => { if ($("#consent").checked && !running) { gstep(2, 2); gsay(($("#name").value.trim() ? "ready" : "name")); } });
+function guideError(code) { const k = { short: "short", busy: "busy", full: "full", closed: "closed", name: "name", consent: "consent_err" }[code]; gsay(k || "lost"); gstep(code === "name" || code === "consent" ? 1 : 4, code === "name" || code === "consent" ? 0 : 3); }
+function coach(db, sec) {
+  const now = Date.now(); if (sec < 10) { $("#go").disabled = true; $("#go").textContent = (glang === "th" ? `กำลังฟัง… อีก ${Math.ceil(10 - sec)} วินาที` : `Listening… ${Math.ceil(10 - sec)} s more`); } else { $("#go").disabled = false; $("#go").textContent = "Stop and send · หยุดและส่ง"; }
+  quietN = db < -52 && sec >= 2 ? quietN + 1 : 0;
+  if (now - lastCoach < 5000) return;
+  if (quietN >= 4) { lastCoach = now; gsay("quiet"); } else if (db > -4 && sec >= 1) { lastCoach = now; gsay("loud"); }
+  else if (sec >= 30) { lastCoach = now; gsay("enough"); } else if (sec >= 20 && gstage !== 6) { lastCoach = now; gsay("almost"); } else if (sec >= 5 && !coach.said5) { coach.said5 = true; lastCoach = now; gsay("good"); }
+}
+function showErr(m) { const e = $("#err"); e.textContent = m; e.classList.remove("hide"); }
+$("#cancel").onclick = () => { finished = true; running = false; try { sock.close(); } catch {} cleanup(); gstep(2, 2); gsay("cancelled"); $("#status").textContent = ""; $("#cancel").classList.add("hide"); };
+function cleanup() { running = false; $("#cancel").classList.add("hide"); stream && stream.getTracks().forEach(t => t.stop()); node && node.disconnect(); ctx && ctx.close(); stream = node = ctx = null; $("#go").classList.remove("live"); $("#go").disabled = false; $("#go").textContent = "Start recording · เริ่มอัดเสียง"; $("#meter").style.width = "0"; }
+async function start() {
+  $("#err").classList.add("hide"); const name = $("#name").value.trim();
+  if (!name) { guideError("name"); return showErr("Please type your name. · กรุณาใส่ชื่อ"); }
+  if (!$("#consent").checked) { guideError("consent"); return showErr("Please tick the consent box. · กรุณาติ๊กช่องยินยอม"); }
+  gstep(3, 2); gsay("mic"); coach.said5 = false; quietN = 0; lastCoach = 0;
+  if (!window.isSecureContext) return showErr("The microphone needs a secure (https) page.");
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true } }); }
+  catch (e) { gsay("mic_err"); gstep(3, 2); return showErr("Microphone error: " + e.message + ". Allow the microphone for this page and try again."); }
+  ctx = new AudioContext(); await ctx.resume(); await ctx.audioWorklet.addModule("/static/pcm-worklet.js");
+  node = new AudioWorkletNode(ctx, "pcm-downsampler"); ctx.createMediaStreamSource(stream).connect(node);
+  try { localStorage.setItem("secrets.guestName", name); } catch {}
+  finished = false; sock = new WebSocket(`wss://${location.host}/ws/enroll-guest?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}&consent=1`); sock.binaryType = "arraybuffer";
+  node.port.onmessage = e => { if (sock.readyState === 1 && running) sock.send(e.data); };
+  sock.onopen = () => { running = true; $("#go").textContent = "Stop and send · หยุดและส่ง"; $("#go").classList.add("live"); $("#cancel").classList.remove("hide"); $("#status").textContent = "Recording… read the text aloud."; gstep(4, 3); gsay("rec"); };
+  sock.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === "level") { coach(m.db, m.seconds); $("#meter").style.width = Math.max(0, Math.min(100, (m.db + 60) * 2)) + "%"; $("#status").textContent = `Recording… ${m.seconds | 0} s` + (m.seconds < 25 ? " (keep reading, about 30 s)" : ""); if (m.seconds >= 55 && running) stop(); }
+    else if (m.type === "submitted") { finished = true; gstep(6, 6); gsay("done"); $("#cancel").classList.add("hide"); $("#secs").textContent = Math.round(m.speech_s); $("#form").classList.add("hide"); $("#done").classList.remove("hide"); cleanup(); }
+    else if (m.type === "error") { finished = true; showErr(m.message); guideError(m.code); cleanup(); $("#status").textContent = ""; }
+  };
+  sock.onclose = () => { if (running && !finished) { cleanup(); gsay("lost"); showErr("The connection was lost. Please try again."); } };
+}
+function stop() { if (!running) return; gstep(5, 4); gsay("sending"); $("#cancel").classList.add("hide"); $("#go").disabled = true; $("#status").textContent = "Sending…"; sock.send(JSON.stringify({ type: "stop" })); running = false; }
+$("#go").onclick = () => { if (running) stop(); else start(); };
+loadGuide();
+$("#again").onclick = () => { gstep(1, 0); if (G) gsay("hello", G.name); $("#done").classList.add("hide"); $("#form").classList.remove("hide"); $("#name").value = ""; $("#consent").checked = false; $("#status").textContent = ""; };
+</script>
+</body>
+</html>

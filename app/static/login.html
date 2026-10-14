@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Secrets</title>
+<link rel="stylesheet" href="/static/fonts.css">
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#dfe3e9;--acc:#2f6fed;--acc2:#7c3aed;--bad:#dc2626;--warn:#b45309;--field:#f8f9fb}
+:root[data-theme=dark]{--bg:#0f1419;--card:#171e27;--ink:#e8ecf1;--mute:#93a0b1;--line:#2a3441;--acc:#5b8cff;--acc2:#a78bfa;--bad:#f87171;--warn:#fbbf24;--field:#10161d}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1419;--card:#171e27;--ink:#e8ecf1;--mute:#93a0b1;--line:#2a3441;--acc:#5b8cff;--acc2:#a78bfa;--bad:#f87171;--warn:#fbbf24;--field:#10161d}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,"Noto Sans Thai",system-ui,sans-serif;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+.brand{position:relative;overflow:hidden;padding:48px clamp(28px,5vw,72px);display:flex;flex-direction:column;justify-content:space-between;color:#fff;
+  background:radial-gradient(1200px 600px at -10% -10%,rgba(255,255,255,.18),transparent 60%),linear-gradient(135deg,#1e3a8a 0%,#2f6fed 45%,#7c3aed 100%)}
+.brand h1{font-size:30px;margin:0;letter-spacing:.2px}.brand .logo{display:flex;align-items:center;gap:12px}
+.brand .mark{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-weight:700;font-size:20px;border:1px solid rgba(255,255,255,.3)}
+.brand .lead{font-size:22px;line-height:1.45;max-width:30ch;margin:40px 0 18px}
+.brand ul{list-style:none;padding:0;margin:0;display:grid;gap:10px;opacity:.92;font-size:15px}.brand li::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-right:10px;vertical-align:2px;opacity:.8}
+.brand small{opacity:.75;font-size:13px}
+.panel{display:grid;place-items:center;padding:32px 20px;position:relative}
+.box{width:min(400px,100%)}
+.box h2{font-size:24px;margin:0 0 4px}.sub{color:var(--mute);margin:0 0 22px;font-size:15px}
+label{display:block;font-size:14px;color:var(--mute);margin:14px 0 6px}
+.field{position:relative}
+input{font:inherit;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
+.field input{padding-right:76px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--acc);font:600 13px inherit;padding:8px 10px;cursor:pointer;border-radius:8px}
+.eye:hover{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.caps{color:var(--warn);font-size:13px;margin-top:6px;display:none}.caps.on{display:block}
+.btn{width:100%;margin-top:22px;padding:13px;border:0;border-radius:10px;background:var(--acc);color:#fff;font:600 16px inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn:disabled{opacity:.7;cursor:progress}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ink);margin-top:12px;font-weight:500}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:r .8s linear infinite;display:none}.busy .spin{display:inline-block}
+@keyframes r{to{transform:rotate(360deg)}}
+.err{display:none;margin-top:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--bad);color:var(--bad);font-size:14px;background:color-mix(in srgb,var(--bad) 7%,transparent)}.err.on{display:block}
+.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:13px;margin:20px 0 0}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.setup{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);font-size:14px;color:var(--mute);margin-bottom:6px}
+.setup b{color:var(--ink)}.setup code{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:13px}
+.theme{position:absolute;top:16px;right:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;font:13px inherit;cursor:pointer}
+.foot{margin-top:22px;color:var(--mute);font-size:12.5px;text-align:center}
+.hide{display:none!important}
+@media (max-width:860px){body{grid-template-columns:1fr}.brand{padding:22px 22px 20px}.brand .lead{font-size:17px;margin:14px 0 0}.brand ul,.brand small{display:none}.panel{align-items:start;padding-top:28px}}
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+<aside class="brand">
+  <div class="logo"><div class="mark">S</div><h1>Secrets</h1></div>
+  <div>
+    <p class="lead">Thai meeting recorder that keeps every word on this device. · บันทึกและสรุปการประชุมภาษาไทย ข้อมูลอยู่ในเครื่องนี้เท่านั้น</p>
+    <ul><li>Live Thai captions and accurate transcripts</li><li>Speaker names, participation report and AI notes</li><li>Nothing is uploaded: audio, text and voices stay here</li></ul>
+  </div>
+  <small>On-device · Qualcomm IQ9</small>
+</aside>
+<main class="panel">
+  <button class="theme" id="theme" type="button" aria-label="Switch light/dark theme">Theme</button>
+  <div class="box">
+    <form id="login" novalidate>
+      <h2 id="ttl">Sign in</h2>
+      <p class="sub" id="sub">Use your Secrets account · เข้าสู่ระบบด้วยบัญชีของคุณ</p>
+      <div id="setupInfo" class="setup hide"><b>First start: create the administrator account.</b><br>No accounts exist yet. Enter the <b>setup code</b> to prove you own this box: it is in <code>data/access.token</code> and is printed in the server log at start (it was the old access code). Then choose a user name and a password of at least <span id="minpw">12</span> characters.</div>
+      <div id="codeRow" class="hide"><label for="code">Setup code</label><input id="code" autocomplete="off" spellcheck="false"></div>
+      <label for="username">User name · ชื่อผู้ใช้</label><input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      <div id="nameRow" class="hide"><label for="dname">Display name (optional)</label><input id="dname" autocomplete="name"></div>
+      <label for="password">Password · รหัสผ่าน</label>
+      <div class="field"><input id="password" type="password" autocomplete="current-password" required><button class="eye" type="button" id="eye" aria-label="Show password">Show</button></div>
+      <div class="caps" id="caps" role="status">Caps Lock is on</div>
+      <div id="pw2Row" class="hide"><label for="password2">Repeat the password</label><input id="password2" type="password" autocomplete="new-password"></div>
+      <button class="btn" id="go" type="submit"><span class="spin"></span><span id="goTxt">Sign in</span></button>
+      <div class="err" id="err" role="alert"></div>
+      <div id="ssoBox"><div class="or">or</div><a class="btn ghost" href="/sso" style="text-decoration:none">Sign in with company SSO (coming soon)</a></div>
+      <p class="foot" id="foot">Sessions end after 8 hours. Forgot your password? Ask an administrator to set a new one.</p>
+    </form>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let setup = false;
+const root = document.documentElement;
+const savedTheme = localStorage.getItem("secrets_theme"); if (savedTheme) root.dataset.theme = savedTheme;
+$("#theme").onclick = () => { const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; root.dataset.theme = dark ? "light" : "dark"; localStorage.setItem("secrets_theme", root.dataset.theme); };
+$("#eye").onclick = () => { const p = $("#password"), show = p.type === "password"; p.type = show ? "text" : "password"; if (setup) $("#password2").type = p.type; $("#eye").textContent = show ? "Hide" : "Show"; $("#eye").setAttribute("aria-label", show ? "Hide password" : "Show password"); p.focus(); };
+const caps = e => { if (e.getModifierState) $("#caps").classList.toggle("on", e.getModifierState("CapsLock")); };
+["#password", "#password2"].forEach(s => { $(s).addEventListener("keyup", caps); $(s).addEventListener("keydown", caps); $(s).addEventListener("blur", () => $("#caps").classList.remove("on")); });
+function err(m) { $("#err").textContent = m; $("#err").classList.toggle("on", !!m); }
+async function init() {
+  let s; try { s = await (await fetch("/api/auth/state")).json(); } catch { err("Cannot reach the Secrets server."); return; }
+  if (s.signed_in) { location.replace("/"); return; }
+  $("#minpw").textContent = s.min_password;
+  if (s.remote_needs_https) err("Sign-in from another device needs HTTPS: open this page with https:// instead of http://.");
+  setup = s.setup_needed;
+  if (setup) {
+    $("#ttl").textContent = "Set up Secrets"; $("#sub").textContent = "Create the first administrator · สร้างบัญชีผู้ดูแลระบบ";
+    ["#setupInfo", "#codeRow", "#nameRow", "#pw2Row"].forEach(x => $(x).classList.remove("hide")); $("#ssoBox").classList.add("hide");
+    $("#password").autocomplete = "new-password"; $("#goTxt").textContent = "Create administrator"; $("#foot").textContent = "There are no default accounts or passwords.";
+    $("#code").focus();
+  } else $("#username").focus();
+}
+$("#login").onsubmit = async e => {
+  e.preventDefault(); err("");
+  const u = $("#username").value.trim(), p = $("#password").value;
+  if (setup && !$("#code").value.trim()) return err("Enter the setup code.");
+  if (!u) return err("Enter your user name."); if (!p) return err("Enter your password.");
+  if (setup && p.length < +$("#minpw").textContent) return err(`The password needs at least ${$("#minpw").textContent} characters.`);
+  if (setup && p !== $("#password2").value) return err("The two passwords are different.");
+  const b = $("#go"); b.disabled = true; b.classList.add("busy"); $("#goTxt").textContent = setup ? "Creating…" : "Signing in…";
+  try {
+    const r = await fetch(setup ? "/api/auth/setup" : "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(setup ? { code: $("#code").value.trim(), username: u, name: $("#dname").value, password: p } : { username: u, password: p }) });
+    if (r.ok) { location.replace("/"); return; }
+    let m = "Sign-in failed (" + r.status + ")"; try { m = (await r.json()).detail || m; } catch {}
+    err(m.charAt(0).toUpperCase() + m.slice(1) + ".");
+    if (!setup) { $("#password").value = ""; $("#password").focus(); }
+  } catch { err("The server did not answer. Check the network and try again."); }
+  b.disabled = false; b.classList.remove("busy"); $("#goTxt").textContent = setup ? "Create administrator" : "Sign in";
+};
+init();
+</script>
+</body>
+</html>

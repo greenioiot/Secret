@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enrolment guide · Secrets</title>
+<link rel="stylesheet" href="/static/fonts.css">
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--fs:20px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--card:#171e27;--ink:#e8ecf1;--mute:#93a0b1;--line:#27313d;--acc:#5b8cff;--ok:#34d399;--warn:#fbbf24;--bad:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:var(--fs)/1.5 Inter,"Noto Sans Thai",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--line);font-size:16px}
+header b{font-size:18px;flex:1;min-width:200px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button,.btn{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:7px 12px;cursor:pointer}
+.seg button.on{background:var(--acc);color:var(--acc-ink)}
+.btn{border:1px solid var(--line);border-radius:8px;background:var(--card)}
+main{flex:1;display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:20px;padding:20px;max-width:1500px;width:100%;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+.qr{width:100%;max-width:360px;aspect-ratio:1;background:#fff;border-radius:12px;padding:8px;display:block;margin:0 auto}
+.addr{font:600 1.05em/1.35 ui-monospace,Menlo,monospace;word-break:break-all;background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:12px;text-align:center}
+.small{font-size:.65em;color:var(--mute)}
+.step{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.step:last-child{border:0}
+.step .n{flex:none;width:2.2em;height:2.2em;border-radius:50%;background:var(--acc);color:var(--acc-ink);display:grid;place-items:center;font-weight:700}
+.step .t{font-weight:600}.step .d{font-size:.8em;color:var(--mute)}
+.bubble{margin:0 20px 20px;max-width:1460px;align-self:center;width:calc(100% - 40px);display:flex;gap:16px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 20px}
+.av{flex:none;width:3em;height:3em;border-radius:50%;background:var(--acc);color:var(--acc-ink);display:grid;place-items:center;font-weight:700;font-size:1.2em}
+#msg{transition:opacity .4s}#msg.fade{opacity:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:.7em}
+.chip{border:1px solid var(--line);border-radius:99px;padding:3px 12px;color:var(--mute)}.chip.ok{color:var(--ok);border-color:var(--ok)}.chip.warn{color:var(--warn);border-color:var(--warn)}.chip.bad{color:var(--bad);border-color:var(--bad)}
+.closed{background:#d9770618;border:1px solid var(--warn);border-radius:16px;padding:16px 20px;margin:20px 20px 0;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.hide{display:none!important}
+</style>
+<link rel="stylesheet" href="/static/theme.css">
+<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+<header><b id="title">Secrets · ลงทะเบียนเสียง / Voice enrolment</b>
+  <span class="seg" id="langSeg"><button data-l="th">ไทย</button><button data-l="both">ไทย+EN</button><button data-l="en">EN</button></span>
+  <button class="btn" id="smaller" aria-label="Smaller text">A−</button><button class="btn" id="bigger" aria-label="Larger text">A+</button>
+  <button class="btn hide" id="speak">🔊</button><button class="btn" id="full">⛶</button></header>
+<div id="closed" class="closed hide"><b id="closedTxt"></b><button class="btn" id="openLink" style="background:var(--acc);color:var(--acc-ink)">Open the enrolment link (30 min)</button></div>
+<main>
+  <section class="card" style="text-align:center">
+    <div id="qrBox"></div>
+    <div class="addr" id="link"></div>
+    <div class="small" style="margin-top:10px" id="appline"></div>
+    <div class="chips" id="status" style="justify-content:center"></div>
+  </section>
+  <section class="card"><div id="steps"></div></section>
+</main>
+<div class="bubble"><div class="av" id="av">?</div><div style="flex:1"><div id="msg"></div></div></div>
+<script>
+const $ = s => document.querySelector(s);
+let G = null, userMode = "", ri = 0, fs = 20, qrSig = "";
+const effMode = () => userMode || (G ? (G.lang_pref === "th" ? "th" : G.lang_pref === "en" ? "en" : "both") : "both");
+try { fs = +localStorage.getItem("secrets.guideFs") || 20; userMode = localStorage.getItem("secrets.guideLang") || ""; } catch {}
+const setFs = d => { fs = Math.max(14, Math.min(40, fs + d)); document.documentElement.style.setProperty("--fs", fs + "px"); try { localStorage.setItem("secrets.guideFs", fs); } catch {} };
+setFs(0);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); kids.flat().forEach(k => e.append(k)); return e; };
+const langs = () => { const m = effMode(); return m === "both" ? ["th", "en"] : [m]; };
+function setMode(m) { userMode = m; try { localStorage.setItem("secrets.guideLang", m); } catch {} render(); showMsg(false); }
+document.querySelectorAll("#langSeg button").forEach(b => b.onclick = () => setMode(b.dataset.l));
+$("#bigger").onclick = () => setFs(2); $("#smaller").onclick = () => setFs(-2);
+$("#full").onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); };
+function line(obj) { return el("div", {}, langs().map((l, i) => el("div", { className: i ? "small" : "", textContent: obj[l] }))); }
+function render() {
+  if (!G) return;
+  const open = G.open && G.enabled;
+  $("#closed").classList.toggle("hide", open);
+  $("#closedTxt").textContent = !G.enabled ? "Voice enrolment is switched off in Settings. · การลงทะเบียนเสียงปิดอยู่ในการตั้งค่า" : "The enrolment link is closed. Open it so people can scan the QR. · ลิงก์ปิดอยู่ กดเปิดเพื่อให้ผู้เข้าร่วมสแกน";
+  $("#openLink").classList.toggle("hide", !G.enabled);
+  const url = G.enroll_urls[0] || "", sig = url;
+  if (sig !== qrSig) { qrSig = sig; $("#qrBox").replaceChildren(url ? el("img", { className: "qr", alt: "QR", src: "/api/enroll-qr.svg?i=0&k=" + encodeURIComponent(url.slice(-12)) }) : el("div", { className: "small", textContent: "—" })); }
+  $("#link").textContent = url || (G.app_urls[0] || "");
+  $("#appline").textContent = (langs()[0] === "th" ? "ที่อยู่ของระบบ: " : "System address: ") + (G.app_urls || []).join("   ") + (G.wifi ? "   ·   Wi-Fi: " + G.wifi : "");
+  $("#av").textContent = (G.name || "?").slice(0, 1); const em = effMode(); document.querySelectorAll("#langSeg button").forEach(b => b.classList.toggle("on", b.dataset.l === em)); $("#title").textContent = "Secrets · " + (em === "en" ? "Voice enrolment" : "ลงทะเบียนเสียง" + (em === "both" ? " / Voice enrolment" : ""));
+  const left = Math.max(0, G.expires_in), chips = [];
+  chips.push(el("span", { className: "chip " + (open ? "ok" : "warn"), textContent: open ? `Link open ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "Link closed" }));
+  chips.push(el("span", { className: "chip" + (G.pending.length ? " warn" : ""), textContent: G.pending.length ? "Waiting for the host: " + G.pending.join(", ") : "No one waiting" }));
+  chips.push(el("span", { className: "chip", textContent: `Enrolled voices: ${G.enrolled}` }));
+  $("#status").replaceChildren(...chips);
+  $("#steps").replaceChildren(...G.steps.map((s, i) => el("div", { className: "step" }, el("div", { className: "n", textContent: i + 1 }), el("div", {}, ...langs().map((l, j) => el("div", {}, el("div", { className: "t" + (j ? " small" : ""), textContent: s[l][0] }), el("div", { className: "d", textContent: s[l][1] })))))));
+  $("#speak").classList.toggle("hide", !("speechSynthesis" in window));
+}
+function showMsg(adv = true) {
+  if (!G || !G.rotate.length) return; if (adv) ri = (ri + 1) % G.rotate.length; const m = $("#msg"); m.classList.add("fade");
+  setTimeout(() => { m.replaceChildren(line(G.rotate[ri])); m.classList.remove("fade"); }, adv ? 350 : 0);
+}
+async function poll() {
+  try { const r = await fetch("/api/guide"); if (r.status === 401) { location.href = "/login"; return; } G = await r.json(); render(); if (!$("#msg").firstChild) showMsg(false); } catch {}
+}
+$("#openLink").onclick = async () => { await fetch("/api/enroll", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ open: true, minutes: 30 }) }); poll(); };
+$("#speak").onclick = () => {
+  if (!G || !("speechSynthesis" in window)) return; speechSynthesis.cancel(); const voices = speechSynthesis.getVoices();
+  const say = (lang, text) => { const u = new SpeechSynthesisUtterance(text); u.lang = lang; const v = voices.find(v => v.lang && v.lang.toLowerCase().startsWith(lang.slice(0, 2))); if (v) u.voice = v; speechSynthesis.speak(u); return !!v; };
+  const hasTh = voices.some(v => (v.lang || "").toLowerCase().startsWith("th"));
+  const mode = effMode();
+  if (mode !== "en" && hasTh) say("th-TH", "ที่อยู่ของระบบคือ " + G.spoken.th + " ต้องต่อ Wi-Fi เดียวกัน");
+  if (mode !== "th" || !hasTh) say("en-US", "The address is " + G.spoken.en + ". Use the same Wi-Fi.");
+};
+setInterval(poll, 3000); setInterval(() => showMsg(true), 9000); poll();
+</script>
+</body>
+</html>
