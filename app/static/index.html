@@ -230,6 +230,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
     <div class="rec-wrap" style="margin-top:20px">
       <button id="recBtn">Start<br>เริ่ม</button>
       <div><div class="timer" id="timer">00:00:00</div><div class="meter"><i id="meter"></i></div><div class="mute" id="recMsg" style="margin-top:8px">Ready. Audio is saved to this device while you speak.</div>
+        <div class="hide" id="recWarn" style="margin-top:6px;color:var(--bad);font-weight:600" aria-live="assertive"></div>
         <div class="engs hide" id="engStrip"></div>
         <button class="btn" id="pfBtn" style="margin-top:8px;font-size:13px;padding:4px 10px">Check system · ตรวจระบบ</button>
         <div class="row hide" id="recActions" style="margin-top:10px;gap:8px"><button class="btn pri" id="endBtn">End meeting · จบการประชุม</button><button class="btn danger" id="cancelBtn">Cancel meeting · ยกเลิก</button></div></div>
@@ -732,12 +733,13 @@ function connect() {
     if (m.type === "started") {
       meetingId = m.id; resumeFrom = null; baseSec = m.base; pushDetails();
       if ($("#recJoin").checked && settings.allow_join) joinSet(true);
-      if (botCfg && botCfg.enabled) pushBot(true); startedAt = Date.now(); $("#recMsg").textContent = "Recording… audio is saved on this device.";
+      if (botCfg && botCfg.enabled) pushBot(true); startedAt = Date.now(); $("#recMsg").textContent = "Recording… audio is saved on this device." + (lastHeard ? ` Sound check ✓ heard “${lastHeard}”.` : "");
       showEngines(m.engines, true);
       for (const b of pending) ws.send(b); pending = [];   // audio captured while the link was down
     } else if (m.type === "level") {
       $("#meter").style.width = m.db == null ? "0" : Math.max(0, Math.min(100, (m.db + 60) * 2)) + "%";
     } else if (m.type === "caption") addCap(m);
+    else if (m.type === "notice") recWarn(m.clear ? "" : "⚠ " + m.message);
     else if (m.type === "partial") setPartial(m);
     else if (m.type === "error") { $("#recMsg").textContent = "⚠ " + m.message; if (!meetingId) { endLocal(); resumeFrom = null; } }
     else if (m.type === "bot") botPush(m);
@@ -773,15 +775,43 @@ async function micCheck() {   // opens the microphone (kept for the recording wh
   if (tr && (tr.muted || tr.readyState !== "live")) return { id: "mic", label: "Microphone", status: "fail", detail: `${name}: muted or not delivering sound` };
   return { id: "mic", label: "Microphone", status: db < -60 ? "warn" : "ok", detail: `${name} · level ${db.toFixed(0)} dB` + (db < -60 ? ": almost silent, check that it is not muted (say something while checking)" : "") };
 }
+const SOUND_CHECK_S = 4;
+let lastHeard = "";
+function recWarn(text) { const w = $("#recWarn"); w.textContent = text; w.classList.toggle("hide", !text); }
+async function soundCheck(onTick) {   // a few seconds from the real microphone through the same 16 kHz path as a meeting; the server measures it and runs the speech model on it
+  const a = new AudioContext(); await a.resume();
+  let n; try { await a.audioWorklet.addModule("/static/pcm-worklet.js"); n = new AudioWorkletNode(a, "pcm-downsampler"); a.createMediaStreamSource(stream).connect(n); }
+  catch (e) { a.close().catch(() => {}); return [{ id: "sound", label: "Sound check", status: "fail", detail: "the browser could not capture audio: " + e.message }]; }
+  const chunks = []; let peak = 0;
+  n.port.onmessage = e => { chunks.push(e.data); let p = 0; for (const x of new Int16Array(e.data)) { const ax = Math.abs(x); if (ax > p) p = ax; } peak = p / 32768; };
+  const t0 = Date.now(), DUR = SOUND_CHECK_S * 1000;
+  while (Date.now() - t0 < DUR) { await new Promise(r => setTimeout(r, 100)); onTick(peak > 0 ? 20 * Math.log10(peak) : -120, (DUR - (Date.now() - t0)) / 1000); }
+  n.port.onmessage = null; n.disconnect(); a.close().catch(() => {});
+  try {
+    const r = await fetch("/api/preflight/sound?mode=" + mode, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-CSRF-Token": csrfToken() }, body: new Blob(chunks) });
+    if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+    const j = await r.json(); lastHeard = j.text || ""; return j.checks;
+  } catch (e) { return [{ id: "sound", label: "Sound check", status: "fail", detail: "the sample could not be checked by the server: " + e.message }]; }
+}
 let pfRunning = false;
 async function preflight(thenStart) {
   if (pfRunning) return; pfRunning = true;
   const btn = $("#recBtn"); if (thenStart) { btn.disabled = true; btn.innerHTML = "Checking…<br>กำลังตรวจ"; }
-  renderPreflight([{ label: "Microphone", status: "run", detail: "listening for 1.5 s…" }, { label: "Server, worker, disk, models", status: "run", detail: "checking…" }], "System check · ตรวจระบบก่อนเริ่ม");
-  let srv;
-  const [mic] = await Promise.all([micCheck(), api("/preflight?mode=" + mode).then(r => { srv = r; }).catch(e => { srv = { status: "fail", checks: [{ id: "server", label: "Server", status: "fail", detail: "not reachable: " + e.message }] }; })]);
+  const HEAD = "System check · ตรวจระบบก่อนเริ่ม", SRV = { label: "Server, worker, disk, models", status: "run", detail: "checking…" };
+  renderPreflight([{ label: "Microphone", status: "run", detail: "listening for 1.5 s…" }, { label: "Sound check", status: "run", detail: "waits for the microphone…" }, SRV], HEAD);
+  let srv, snd = [];
+  const srvP = api("/preflight?mode=" + mode).then(r => { srv = r; }).catch(e => { srv = { status: "fail", checks: [{ id: "server", label: "Server", status: "fail", detail: "not reachable: " + e.message }] }; });
+  const mic = await micCheck();
+  lastHeard = "";
+  if (mic.status !== "fail") {   // the microphone is open: ask for a sentence and send it through the real path
+    const bar = (db, left) => "🎤 Say a short sentence now · พูดประโยคสั้น ๆ  " + "█".repeat(Math.max(0, Math.min(10, Math.round((db + 60) / 5)))) + "░".repeat(10 - Math.max(0, Math.min(10, Math.round((db + 60) / 5)))) + `  ${Math.ceil(left)} s`;
+    snd = await soundCheck((db, left) => renderPreflight([mic, { label: "Sound check", status: "run", detail: bar(db, left) }, srv ? { ...SRV, status: "ok", detail: "done" } : SRV], HEAD));
+    renderPreflight([mic, ...snd, srv ? { ...SRV, status: "ok", detail: "done" } : SRV], HEAD);
+  } else snd = [{ id: "sound", label: "Sound check", status: "info", detail: "skipped: the microphone is not available" }];
+  await srvP;
   pfRunning = false; btn.disabled = false; btn.innerHTML = "Start<br>เริ่ม";
-  const checks = [mic, ...srv.checks], worst = checks.some(c => c.status === "fail") ? "fail" : checks.some(c => c.status === "warn") ? "warn" : "ok";
+  const checks = [mic, ...snd, ...srv.checks], worst = checks.some(c => c.status === "fail") ? "fail" : checks.some(c => c.status === "warn") ? "warn" : "ok";
   if (srv.engines) showEngines(srv.engines, false);
   const stopMic = () => { if (!recording && stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } };
   if (worst === "fail") { stopMic(); renderPreflight(checks, "✕ Not ready: fix the red items, then check again", [el("button", { className: "btn pri", textContent: "Check again", onclick: () => preflight(thenStart) })]); return; }
@@ -814,6 +844,7 @@ async function startRec() {
   } catch (e) { $("#recMsg").textContent = "Microphone error: " + e.message; return; }
   ctx = new AudioContext(); await ctx.resume(); await ctx.audioWorklet.addModule("/static/pcm-worklet.js");
   node = new AudioWorkletNode(ctx, "pcm-downsampler"); ctx.createMediaStreamSource(stream).connect(node);
+  watchMic();
   node.port.onmessage = e => {
     if (ws && ws.readyState === 1 && meetingId) ws.send(e.data);
     else { pending.push(e.data); if (pending.length > 15000) pending.shift(); }  // up to ~5 minutes while offline
@@ -822,11 +853,25 @@ async function startRec() {
   recording = true; stopping = false; meetingId = null; pending = []; $("#caps").replaceChildren(el("span", { className: "mute", textContent: "Listening…" }));
   ui(true); connect(); tick();
 }
+function watchMic() {   // the microphone during a meeting: muted by the system / unplugged -> warning; unplugged -> the default microphone takes over
+  const tr = stream && stream.getAudioTracks()[0]; if (!tr) return;
+  tr.onmute = () => { if (recording) recWarn("⚠ The microphone stopped delivering sound (muted by the system, or unplugged)."); };
+  tr.onunmute = () => recWarn("");
+  tr.onended = async () => {
+    if (!recording || stopping) return;
+    recWarn("⚠ The microphone was disconnected: switching to another one…");
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: !!settings.mic_echo_cancel, noiseSuppression: !!settings.mic_noise_suppress, autoGainControl: !!settings.mic_auto_gain } });
+      ctx.createMediaStreamSource(stream).connect(node); watchMic(); listMics();
+      recWarn("⚠ Microphone changed to “" + ((stream.getAudioTracks()[0] || {}).label || "the default microphone") + "”: check that it picks up the room.");
+    } catch (e) { recWarn("⚠ No microphone: nothing is being recorded. Plug one in (the recording continues by itself) or press Stop."); }
+  };
+}
 function tick() { if (!recording) return; $("#timer").textContent = fmt(baseSec + (Date.now() - startedAt) / 1000); requestAnimationFrame(() => setTimeout(tick, 500)); }
 function ui(on) { const b = $("#recBtn"); $("#recActions").classList.toggle("hide", !on); b.classList.toggle("live", on); b.innerHTML = on ? "Stop<br>หยุด" : "Start<br>เริ่ม"; $("#title").disabled = on; $("#pfBtn").classList.toggle("hide", on); if (!on) $("#engStrip").classList.add("hide"); }
 function endLocal() {
   recording = false; stream && stream.getTracks().forEach(t => t.stop()); node && node.disconnect(); ctx && ctx.state !== "closed" && ctx.close().catch(() => {}); wake && wake.release().catch(() => {});
-  ui(false); $("#meter").style.width = "0";
+  ui(false); $("#meter").style.width = "0"; recWarn("");
 }
 function finished(m) {
   endLocal(); meetingId = null; $("#timer").textContent = "00:00:00"; $("#recRemark").value = ""; recPeople.set([]); $("#title").value = ""; planId = null; loadPlans(); $("#joinPanel").classList.add("hide"); $("#joinPanel").replaceChildren(); $("#recJoin").checked = true; renderRecQr(); botEnded();

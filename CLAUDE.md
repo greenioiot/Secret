@@ -1,7 +1,8 @@
 # Secrets (Zecret) — project rules
 
 Thai meeting recorder: FastAPI server `app/server.py` (HTTPS port **8444**), worker `app/worker.py`, `nemo_server`,
-single-file UI `app/static/index.html`. Records of work: `PROGRESS.md`, `features.txt`, `PERFORMANCE.md`. Not a git repository.
+single-file UI `app/static/index.html`. Records of work: `PROGRESS.md`, `features.txt`, `PERFORMANCE.md`. Git: github.com/greenioiot/Secret
+(private, branch `main`); commit and push after every round. Tests live in `tools/tests/` (they run against a scratch instance on 8445).
 
 ## Scope: this project only
 

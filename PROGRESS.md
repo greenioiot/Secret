@@ -589,3 +589,31 @@ and transcribed with correction by human afterward".
   reachable and opens; open tab in view in the menu, also when switched by code; no JS errors).
 - Also 2026-10-13: CLAUDE.md written for this project and for Genie Edge (/mnt/genie/projectAI): the two projects are kept apart, each
   has its own Claude session; Secrets only uses Genie's models / venvs read-only (config.PROJECT_AI, NEMO_PY, tts.py).
+
+## Round 50 (2026-10-15): sound check before a meeting + no-sound watchdog during it (never miss a recording)
+- Why: the check before a meeting (Round 39) only opened the microphone and read its level for 1.5 s; in Record-only mode nothing proved
+  that sound reaches the app or that the speech model can read it, and during the meeting the level meter was empty (db = null), so a muted
+  or unplugged microphone went unnoticed until the transcript came back empty.
+- Sound check (both "Check system" and Start): after the microphone opens, the page asks "🎤 Say a short sentence now · พูดประโยคสั้น ๆ" with a
+  level bar and a 4-s countdown, records those seconds through the SAME path as a meeting (pcm-worklet, 16 kHz 16-bit) and POSTs them to
+  POST /api/preflight/sound?mode= (members and admins; viewers 403; 15 s max). The server measures 30-ms frames (peak, room noise = 10th
+  percentile, speech = 90th, SNR, speech seconds by the live segmenter's own rule: 3x the noise floor and >= 220 RMS, clipping) and then
+  runs the live speech model on the sample. Two items: "Sound check" (fail: silent < -60 dB peak; warn: too quiet / no speech said /
+  clipped > 0.5 % / < 10 dB above the noise; ok: "speech -20 dB · room noise -57 dB · 37 dB above the noise") and "Speech recognised"
+  (ok: heard: “…” + model + ms; warn: sound but no words; fail: the model could not run; info: not tested when nothing was said).
+  In Record-only mode the item also names the after-meeting engine when it differs from the live one. The heard text is repeated in the
+  status line once the recording starts ("Sound check ✓ heard “…”").
+- /api/preflight: new item "Recording storage": a file is written + fsynced + removed in data/meetings (fail = no recording possible).
+- During the meeting: the level meter now works in Record-only mode too (packet peak - 10 dB). Server watchdog (a task next to the recorder's
+  socket, so it also fires when no audio packets arrive at all): no packet above -50 dB peak for SECRET_SILENT_S (60 s) -> {"type":"notice",
+  "kind":"silent"} -> red line under the status "⚠ No sound for 60 s: is the microphone muted or unplugged? Say something to test it."
+  (also logged in the meeting's history); sound again -> cleared. Browser: the microphone track is watched: 'mute' -> warning, 'unmute' ->
+  cleared, 'ended' (USB microphone unplugged) -> the default microphone is opened and connected to the running worklet, "⚠ Microphone changed
+  to “…”: check that it picks up the room." (no microphone left -> "nothing is being recorded, plug one in or press Stop").
+- Tests (scratch instance 8445, SECRET_SILENT_S=3; now kept in tools/tests/): test_soundcheck_api.py 16/16 (storage item, speech sample live +
+  Record-only with Pathumma text in ~0.8 s, silence -> fail, noise only -> warn, quiet -> warn, clipped -> warn, empty, 413, member 200,
+  viewer 403), test_soundcheck_ws.py 7/7 (level numbers in Record-only, notice after 5 s of silence, cleared when speech resumes, event logged),
+  test_soundcheck_ui.py with headless Chrome + a WAV as fake microphone: speech 15/15 (prompt + bar shown, items, Start after the check, meter
+  55 % in Record-only, heard text in the status, track watched, microphone replaced, stop), silence 2/2 (banner within 8 s).
+  The WAV samples (6 s of a real meeting + 6 s of silence) are not in the repository: tools/tests/*.py take the folder as an argument.
+- Not done: a timed check before a planned meeting (plans have no start time); the join phones' microphones are not watched.

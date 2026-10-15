@@ -92,6 +92,28 @@ def ctc() -> asr.ThaiCTC:
 
 
 PARTIAL_GAP = {"wctc": 2.0, "pathumma-rnnt": 3.0}  # seconds between interim texts (Pathumma runs on the CPU: about 1 s per call)
+SILENT_WARN_S = int(os.environ.get("SECRET_SILENT_S", "60"))  # recording: no sound for this long -> the recorder is warned (muted / unplugged microphone)
+SOUND_DB = -50.0  # a 20 ms packet whose peak is above this counts as sound (room noise through an open microphone is around -45; a muted one -90 or less)
+
+
+def peak_db(data: bytes) -> float:
+    """Peak level of a packet of 16-bit audio in dB (0 = full scale)."""
+    x = np.frombuffer(data[: len(data) & ~1], np.int16)
+    return 20 * np.log10(int(np.abs(x).max()) / 32768) if len(x) and np.abs(x).max() else -120.0
+
+
+def sound_stats(pcm: np.ndarray) -> dict:
+    """What the sound check measures on a few seconds from the microphone (30 ms frames): the loud and the quiet parts, how far apart they
+    are (signal to noise), how much of it is speech by the live segmenter's own rule (a frame 3x the noise floor, at least 220 RMS), clipping."""
+    fr = pcm[: len(pcm) // 480 * 480].astype(np.float32).reshape(-1, 480)
+    if not len(fr):
+        return {"seconds": 0.0, "peak_db": -120.0, "noise_db": -120.0, "speech_db": -120.0, "snr_db": 0.0, "speech_s": 0.0, "clip_pct": 0.0}
+    rms = np.sqrt((fr ** 2).mean(1)) + 1e-3
+    noise, loud = float(np.percentile(rms, 10)), float(np.percentile(rms, 90))
+    db = lambda v: round(20 * float(np.log10(v / 32768)), 1)  # noqa: E731
+    return {"seconds": round(len(pcm) / config.SR, 1), "peak_db": db(float(np.abs(fr).max()) + 1e-3), "noise_db": db(noise), "speech_db": db(loud),
+            "snr_db": round(20 * float(np.log10(loud / noise)), 1), "speech_s": round(float((rms > max(220.0, noise * 3.0)).sum()) * 0.03, 1),
+            "clip_pct": round(100 * float((np.abs(fr) >= 32000).mean()), 2)}
 
 
 def _drop_ctc():
@@ -143,7 +165,7 @@ SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
 PUBLIC_PATHS = {"/login", "/sso", "/static/fonts.css", "/static/theme.css", "/static/pcm-worklet.js", "/static/login.html", "/api/auth/state", "/api/auth/login", "/api/auth/setup", "/api/auth/logout"}
 ADMIN_GET = ("/api/whois", "/api/email", "/api/users", "/api/enroll", "/guide", "/api/guide", "/api/meetings-unowned", "/api/voices/drafts", "/api/tts")
 ADMIN_WRITE = ("/api/queue/", "/api/whois", "/api/settings", "/api/vocab-suggestions", "/api/vocab", "/api/words", "/api/voices", "/api/enroll", "/api/email", "/api/bot/", "/api/kb", "/api/users", "/api/meetings/assign", "/api/tts")
-MEMBER_WRITE = ("/api/meetings/plan", "/api/table/delete", "/api/kb/search", "/api/me/")
+MEMBER_WRITE = ("/api/meetings/plan", "/api/table/delete", "/api/kb/search", "/api/me/", "/api/preflight")
 MEETING_RE = re.compile(r"^/api/meetings/([0-9]{8}-[0-9]{6}(?:-[0-9]+)?)(/.*)?$")
 BENCH_TOKEN = os.environ.get("SECRET_BENCH_TOKEN", "")  # tools/bench_capacity.py on its own throwaway instance only: header X-Secret-Token = admin
 
@@ -668,6 +690,7 @@ async def ws_record(ws: WebSocket):
     active[mid]["live_file"] = live_file
     active[mid]["pos"] = lambda: base + (pcm_file.tell() // 2) / config.SR  # the recording's position now (seconds): phones are kept on it
     stopped, last_sync, last_level, last_disk, tasks = False, time.time(), 0.0, time.time(), set()
+    snd = {"quiet_since": time.time(), "warned": False, "db": -120.0}  # the no-sound watchdog: a muted or unplugged microphone during a meeting
 
     async def send(obj):
         async with send_lock:
@@ -742,6 +765,17 @@ async def ws_record(ws: WebSocket):
             t.add_done_callback(tasks.discard)
 
     active[mid]["send"] = send
+
+    async def silence_watch():  # also fires when no audio packets arrive at all (the browser's microphone track ended)
+        while True:
+            await asyncio.sleep(5)
+            quiet = time.time() - snd["quiet_since"]
+            if not snd["warned"] and quiet > SILENT_WARN_S:
+                snd["warned"] = True
+                store.log_event(mid, f"no sound from the microphone for {int(quiet)} s")
+                await send({"type": "notice", "kind": "silent", "message": f"No sound for {int(quiet)} s: is the microphone muted or unplugged? Say something to test it."})
+
+    watch_task = asyncio.create_task(silence_watch())
     await ensure_bot(mid)  # a bot configured for this meeting survives a reconnect or a server restart
     if mode == "live":
         await loop.run_in_executor(None, ctc)  # (re)load the speech model now: 0.3 s from the graph cache, so the first caption is not delayed
@@ -761,6 +795,12 @@ async def ws_record(ws: WebSocket):
             if msg.get("bytes"):
                 pcm_file.write(msg["bytes"])
                 active[mid]["ring"].add(msg["bytes"], base + (pcm_file.tell() // 2) / config.SR)
+                snd["db"] = peak_db(msg["bytes"])
+                if snd["db"] > SOUND_DB:
+                    snd["quiet_since"] = now
+                    if snd["warned"]:
+                        snd["warned"] = False
+                        await send({"type": "notice", "kind": "silent", "clear": True})
                 if mode == "live":
                     spawn(seg.feed(msg["bytes"]))
                     if cfg["live_partial"] and not partial_busy[0] and now - last_partial[0] >= PARTIAL_GAP.get(getattr(_ctc, "kind", ""), PARTIAL_EVERY_S) and _ctc is not None and (_ctc.backend == "npu" or getattr(_ctc, "kind", "") == "pathumma-rnnt"):
@@ -777,7 +817,7 @@ async def ws_record(ws: WebSocket):
                     last_sync = now
                 if now - last_level > 0.2:
                     last_level = now
-                    await send({"type": "level", "db": round(seg.level_db, 1) if mode == "live" else None,
+                    await send({"type": "level", "db": round(seg.level_db if mode == "live" else snd["db"] - 10, 1),  # Record only: from the packet peak
                                 "seconds": round(base + (pcm_file.tell() // 2) / config.SR, 1)})
                 if now - last_disk > 30:
                     last_disk = now
@@ -798,6 +838,7 @@ async def ws_record(ws: WebSocket):
         cancelled = bool(active.get(mid, {}).get("cancel"))
         if active.get(mid, {}).get("terminate"):
             stopped = True  # ended from another device: finish and process it exactly like a normal stop
+        watch_task.cancel()
         if mode == "live":
             spawn(seg.flush())
         if tasks:
@@ -935,6 +976,17 @@ async def api_preflight(mode: str = "live"):
         f"{free:.1f} GB free (about {int(free / 0.115)} hours of audio)" + (": free some space first, recording is refused below 1.5 GB" if free < 1.5 else ""))
     ram, need = store.mem_available_gb(), float(cfg.get("reserve_ram_gb", 2.0))
     add("ram", "Memory", "warn" if ram < need else "ok", f"{ram:.1f} GB available" + (f" (below the {need:g} GB kept for recording)" if ram < need else ""))
+    try:  # the recording really can be written where meetings live (a read-only or missing disk shows up now, not when Start is pressed)
+        config.MEETINGS.mkdir(parents=True, exist_ok=True)
+        probe = config.MEETINGS / f".write-test-{os.getpid()}"
+        with open(probe, "wb") as f:
+            f.write(b"ok")
+            f.flush()
+            os.fsync(f.fileno())
+        probe.unlink()
+        add("storage", "Recording storage", "ok", f"writable ({config.MEETINGS})")
+    except OSError as e:
+        add("storage", "Recording storage", "fail", f"cannot write to {config.MEETINGS} ({e.strerror or e}): no recording is possible until this is fixed")
     loop = asyncio.get_running_loop()
     eng = None
     if mode == "live":
@@ -976,6 +1028,63 @@ async def api_preflight(mode: str = "live"):
         add("busy_job", "Background processing", "warn", f"“{jobs[0].get('title') or jobs[0]['id']}” is being processed now ({jobs[0]['status']}): it shares the processor, captions may lag")
     worst = "fail" if any(c["status"] == "fail" for c in checks) else "warn" if any(c["status"] == "warn" for c in checks) else "ok"
     return {"status": worst, "mode": mode, "checks": checks, "engines": p}
+
+
+@app.post("/api/preflight/sound")
+async def api_preflight_sound(request: Request, mode: str = "live"):
+    """The sound check before a meeting. The browser records a few seconds from the real microphone through the same path a meeting uses
+    (16 kHz 16-bit mono) and sends it here. Measured (level, room noise, speech) and then recognised by the live speech model, so
+    "the microphone works, the sound arrives and the words come out" is proven before the meeting instead of discovered after it."""
+    raw = await request.body()
+    if len(raw) > 2 * config.SR * 15:
+        raise HTTPException(413, "sample too long (15 s at most)")
+    pcm = np.frombuffer(raw[: len(raw) & ~1], np.int16)
+    cfg = store.settings()
+    mode = mode if mode in ("live", "after") else cfg["mode"]
+    checks, text, ms, eng = [], "", 0, None
+
+    def add(id_, label, status, detail):
+        checks.append({"id": id_, "label": label, "status": status, "detail": detail})
+
+    st = sound_stats(pcm)
+    if st["seconds"] < 0.5:
+        add("sound", "Sound check", "fail", "no audio arrived from the browser: reload the page and check the microphone permission")
+        return {"status": "fail", "checks": checks, "stats": st, "text": ""}
+    lvl = f"speech {st['speech_db']:.0f} dB · room noise {st['noise_db']:.0f} dB · {st['snr_db']:.0f} dB above the noise"
+    if st["peak_db"] < -60:
+        add("sound", "Sound check", "fail", f"silent (peak {st['peak_db']:.0f} dB): nothing reaches the app. Is the microphone muted, or is another one chosen in Settings?")
+    elif st["speech_s"] < 0.5 and st["speech_db"] - st["noise_db"] >= 10:
+        add("sound", "Sound check", "warn", f"too quiet ({lvl}): speech at {st['speech_db']:.0f} dB is below the level the app listens for. Move closer to the microphone or raise its gain")
+    elif st["speech_s"] < 0.5:
+        add("sound", "Sound check", "warn", f"the microphone delivers sound (noise {st['noise_db']:.0f} dB) but no speech was heard in {st['seconds']:.0f} s: say a sentence while checking")
+    elif st["clip_pct"] > 0.5:
+        add("sound", "Sound check", "warn", f"too loud / distorted ({st['clip_pct']:.1f} % clipped): move the microphone away or lower its gain")
+    elif st["speech_db"] < -35:
+        add("sound", "Sound check", "warn", f"quiet speech ({lvl}): move closer to the microphone or raise its gain")
+    elif st["snr_db"] < 10:
+        add("sound", "Sound check", "warn", f"noisy ({lvl}): a loud room or the microphone far from the people; captions will have more errors")
+    else:
+        add("sound", "Sound check", "ok", lvl)
+    if st["speech_s"] >= 0.5:
+        loop = asyncio.get_running_loop()
+        try:
+            eng = await loop.run_in_executor(CAPTION_POOL, ctc)
+            t0 = time.time()
+            text, _ = await loop.run_in_executor(CAPTION_POOL, eng.transcribe_long, pcm)
+            ms = int((time.time() - t0) * 1000)
+            text = asr.polish(text or "", cfg).strip()
+            p = engines.plan(cfg, eng)
+            after = f" · the transcript after the meeting is made by {p['after']['uses']}" if mode != "live" and p["after"]["uses"] not in p["live"]["name"] else ""
+            if text:
+                add("speech", "Speech recognised", "ok", f"heard: “{text[:100]}” ({p['live']['name']} · {ms} ms){after}")
+            else:
+                add("speech", "Speech recognised", "warn", f"sound arrived but no words were recognised ({p['live']['name']} · {ms} ms): speak closer and clearly, or check that the right microphone is chosen{after}")
+        except Exception as e:  # noqa: BLE001
+            add("speech", "Speech recognised", "fail", f"the speech model could not run ({type(e).__name__}: {str(e)[:120]}): restart the app, or choose another live caption model in Settings")
+    else:
+        add("speech", "Speech recognised", "info", "not tested (nothing was said)")
+    worst = "fail" if any(c["status"] == "fail" for c in checks) else "warn" if any(c["status"] == "warn" for c in checks) else "ok"
+    return {"status": worst, "mode": mode, "checks": checks, "stats": st, "text": text, "ms": ms}
 
 
 @app.get("/api/settings")

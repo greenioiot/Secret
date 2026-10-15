@@ -144,3 +144,8 @@ messages.
   starts and when it will be ready (transcript, who said what, summary step by step), estimated from this box's past meetings.
 - Participants can pass the meeting on: the join page has a "▦ QR" button that shows the meeting's QR code full screen, so the people next to
   them scan it from their phone and join too (with a Copy link button).
+- Sound check before every meeting: the page asks you to say a short sentence, sends it through the real recording path and shows the
+  level, the room noise, and the words the speech model heard, next to the server / worker / disk / memory / storage / model checks. A
+  silent or muted microphone cannot start a meeting; a quiet or noisy one gets a warning with what to do.
+- During the meeting the app watches the microphone: no sound for a minute -> a red warning under the timer (and in the meeting's history);
+  an unplugged USB microphone is replaced by the default one at once and the recording goes on; the level meter also works in Record-only mode.
