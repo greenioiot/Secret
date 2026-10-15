@@ -1,6 +1,6 @@
 # Zecrets – Progress & Resume File
 
-_Renamed from "Zecret" to "Zecrets" on 2026-10-06 (display name only). Folder /home/dev/Secret, venv path, cookie `zecret_token`, env vars ZECRET_DATA/ZECRET_PORT and header X-Zecret-Token keep the old spelling on purpose: renaming them would sign users out / break the running app._
+_Renamed from "Zecret" to "Zecrets" on 2026-10-06 (display name only). On 2026-10-15 the product name Secret/Secrets became Zecret/Zecrets everywhere (UI, cookies `zecret_*`, env ZECRET_*, header X-Zecret-Token, logger names, `tools/zecrets.service`) and the folder became /mnt/project2/Zecret (/home/dev/Zecret); /mnt/project2/Secret and /home/dev/Secret remain as symlinks until the systemd unit is reinstalled. Only Python's `secrets` module and the GitHub repo name (greenioiot/Secret) keep the old word._
 
 Last updated: 2026-10-06 · Web app RUNNING on :8444; speakers, voices, report, access-code editing built and tested (see README.md)
 
@@ -48,8 +48,8 @@ Resume rule: the worker reads `state.json` per meeting and restarts at the first
 - Disk: 27 GB free; ~/.qaihm (29 GB) and ~/.cache/pip are reclaimable but belong to projectAI – ask first.
 
 ## Checklist
-- [x] P1 Board setup: venv /home/dev/Secret/.venv (fastapi, uvicorn, onnxruntime, faster-whisper; tltk skipped: needs scikit-learn build)
-- [x] P2 Backend: app/server.py (FastAPI, token login, WS recording, REST), app/store.py (file store, atomic state.json), data in /home/dev/Secret/data (no SQLite: folders are the index)
+- [x] P1 Board setup: venv /home/dev/Zecret/.venv (fastapi, uvicorn, onnxruntime, faster-whisper; tltk skipped: needs scikit-learn build)
+- [x] P2 Backend: app/server.py (FastAPI, token login, WS recording, REST), app/store.py (file store, atomic state.json), data in /home/dev/Zecret/data (no SQLite: folders are the index)
 - [x] P3 Recording via browser mic (WS, fsync 1 s), live captions, mode setting live|after. Tested: normal, abrupt drop + takeover-resume (offset correct), headless-Chrome fake mic
 - [~] P4 ASR: app/asr.py + app/worker.py done. Synthetic Piper test (40 s): fast/Typhoon CER 2.9% RTF 0.1; accurate/Whisper-th CER 3.5% RTF ~1.1. TODO: benchmark on REAL Thai meeting audio (synthetic TTS proves plumbing only)
 - [x] P5 Speaker identification + naming + report (see Feature round 2); Thai post-processing limited to ำ fix, corrections list
@@ -745,3 +745,11 @@ and transcribed with correction by human afterward".
   with greedy decoding and without a system role; an English prompt was answered correctly. The Q4_0 GGUF on the CPU gets the same Thai prompt
   right, so the AI Hub quantization is the loss. Decision: not used; Gemma stays on the CPU (PERFORMANCE.md §4). The CLI, the bundle, the
   launcher and ~/.cache/geniex were removed the same day (10 GB freed); the steps above reinstall it if a better bundle appears.
+
+## 2026-10-15: folder renamed Secret -> Zecret (last of the wording)
+- `/mnt/project2/Secret` -> `/mnt/project2/Zecret`, `/home/dev/Zecret` symlink; `/mnt/project2/Secret` and `/home/dev/Secret` kept as symlinks
+  so the installed `secrets.service` (WorkingDirectory/ExecStart on the old path) and the running server keep working until the unit is
+  reinstalled: `bash /mnt/project2/Zecret/tools/install-service.sh` (sudo), then `sudo systemctl disable --now secrets` and remove the symlinks.
+- venv shebangs and pyvenv.cfg of `.venv`, `.venv-f5`, `.venv-qwen` rewritten to the new path (119 files); `models/whisper-ctc-npu/npu_ctc.py`
+  sys.path too. `tools/zecrets.service`, `tools/install-service.sh`, CLAUDE.md, PROGRESS.md say Zecret. Still old: the GitHub repo name
+  (greenioiot/Secret, no `gh` on the box) and Claude Code's session folders `~/.claude/projects/-mnt-project2-Secret`.

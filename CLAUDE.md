@@ -2,7 +2,7 @@
 
 Thai meeting recorder: FastAPI server `app/server.py` (HTTPS port **8444**), worker `app/worker.py`, `nemo_server`,
 single-file UI `app/static/index.html`. Records of work: `PROGRESS.md`, `features.txt`, `PERFORMANCE.md`. Git: github.com/greenioiot/Secret
-(private, branch `main`); commit and push after every round. Tests live in `tools/tests/` (they run against a scratch instance on 8445).
+(private, branch `main`; still the old repo name, rename it on GitHub and `git remote set-url origin git@github.com:greenioiot/Zecret.git`); commit and push after every round. Tests live in `tools/tests/` (they run against a scratch instance on 8445).
 
 ## Scope: this project only
 
@@ -25,8 +25,10 @@ and its own CLAUDE.md.
 - Deploy live only when nothing is recording, transcribing, summarizing or analysing (check `data/meetings/*/state.json`
   and `data/.recording`). Never delete the user's real meetings.
 - Test on a scratch copy: `ZECRET_DATA=<scratch> ZECRET_PORT=8445 .venv/bin/python app/server.py`; delete it afterwards.
-- Runs as a systemd unit (`tools/zecrets.service`, Restart=on-failure, starts at boot). The unit installed on the box is still named
-  `secrets.service` (renamed in the repository 2026-10-15; `tools/install-service.sh` with sudo installs it as `zecrets.service`). Restart:
+- Runs as a systemd unit (`tools/zecrets.service`, Restart=on-failure, starts at boot). The folder was renamed `/mnt/project2/Zecret`
+  (`/home/dev/Zecret`) on 2026-10-15; `/mnt/project2/Secret` and `/home/dev/Secret` are compatibility symlinks. The unit installed on the box
+  is still named `secrets.service` and points at the old path; `tools/install-service.sh` with sudo installs it as `zecrets.service` with the
+  new path, after which the two symlinks can be removed. Restart:
   `sudo systemctl restart secrets` (the user runs sudo), or kill the server PID and let systemd start it again; SIGKILL a
   leftover worker / nemo_server; verify exactly one server, worker and nemo_server and that /login answers 200.
 - `index.html` / `join.html` are served from disk (UI changes are live); `server.py` changes need a restart.

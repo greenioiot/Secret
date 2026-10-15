@@ -1,5 +1,5 @@
 # Start Zecrets at boot. Install (once):
-#   sudo cp /mnt/project2/Secret/tools/zecrets.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable zecrets
+#   sudo cp /mnt/project2/Zecret/tools/zecrets.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable zecrets
 # Stop any copy started by hand first (pkill -f run.sh from another shell), then: sudo systemctl start zecrets
 [Unit]
 Description=Zecrets meeting recorder (web app + worker, port 8444)
@@ -11,8 +11,8 @@ RequiresMountsFor=/mnt/project2
 User=dev
 Group=dev
 SupplementaryGroups=render video audio dmaheap
-WorkingDirectory=/mnt/project2/Secret
-ExecStart=/mnt/project2/Secret/run.sh
+WorkingDirectory=/mnt/project2/Zecret
+ExecStart=/mnt/project2/Zecret/run.sh
 # run.sh already restarts the server after its own watchdog exit (75); systemd covers crashes and kills
 Restart=on-failure
 RestartSec=5

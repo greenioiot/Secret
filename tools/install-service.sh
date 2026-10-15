@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install Zecrets as a systemd service (starts at boot, restarts after a crash), then hand over from a copy started by hand.
-# Run in your own terminal (asks for the sudo password):  bash /mnt/project2/Secret/tools/install-service.sh
+# Run in your own terminal (asks for the sudo password):  bash /mnt/project2/Zecret/tools/install-service.sh
 set -euo pipefail
-ROOT=/mnt/project2/Secret
+ROOT=/mnt/project2/Zecret
 UNIT=zecrets.service
 
 echo "== installing $UNIT"
