@@ -648,3 +648,18 @@ and transcribed with correction by human afterward".
   meeting starts as in Round 50. "Check system" and "Continue recording" (an interrupted meeting keeps its mode) do not ask.
 - Test tools/tests/test_mode_choice.py 12/12 (choice shown with both models, default highlighted, Cancel, Record only -> check -> meeting in
   Record-only mode with the switch and the admin default updated, Check system unchanged). Screenshots at 1200 and 390 px looked right.
+
+## Explored 2026-10-15 (no change made): Gemma 4 from Qualcomm AI Hub for the summary
+- Gemma 4 (Google, 2026-04, Apache-2.0): E2B / E4B / 12B / 26B-A4B (MoE, 3.8B active) / 31B; E4B = 4.5B effective, 8B with per-layer
+  embeddings; E2B/E4B/12B also take AUDIO input; 140+ languages pre-trained, "35+ out of the box" (Thai not named; no Thai benchmark found).
+- Qualcomm AI Hub ships Gemma-4-E4B-it and E2B-it for Dragonwing IQ-9075 (= this QCS9075): GENIEX_QAIRT w4a16 7.9 tok/s (TTFT 0.3-8.9 s at
+  4096 ctx), GENIEX_LLAMACPP q4_0 10-13 tok/s (TTFT up to 67 s at 4096 ctx). Bundles are built on QAIRT 2.45; this box has QAIRT 2.46
+  (/usr/lib/libQnnHtp.so v2.46.0, libGenie.so, /usr/bin/genie-t2t-run). The classic Genie runtime is "deprecated soon"; GenieX is the new one.
+- Zero-engineering route for Secrets: the llama.cpp-snapdragon build already in use (0.5.0-dev b11269) lists the gemma4 architecture, and its
+  Hexagon backend repacks Q4_0 / Q4_K / Q8_0 / MXFP4, so ggml-org/gemma-4-E4B-it-GGUF Q4_0 (4.6 GB) should run through summarize.LlamaServer
+  like Typhoon 4B (Typhoon 4B Q4_0 is 2.5 GB: E4B needs ~2 GB more RAM; NPU layer count to find by trial, ngl 24 -> 20 -> 12 -> CPU).
+  26B-A4B Q4_0 is 14.6 GB (CPU only, like Typhoon 30B-A3B, 3.8B active -> similar ~7 tok/s); 12B Q4_0 ~7 GB.
+- Audio: llama.cpp mtmd has an experimental Gemma 4 conformer encoder (BF16 mmproj; llama-server audio routing had 500 errors in 2026-04/05).
+  Gemma 4 FLEURS speech error 0.08 (E4B, all languages) vs Pathumma 6.65 % CER on Thai here: not a replacement for the ASR yet.
+- Next step if wanted (~1 h, reversible): download the E4B Q4_0 GGUF into models/gemma4/, add summary_model "gemma4-e4b", run the same
+  5.4-min / 37-min meeting comparison as for Chinda (time + invented facts), keep it only if it beats Typhoon 4B.
