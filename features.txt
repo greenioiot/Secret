@@ -152,3 +152,5 @@ messages.
 - Participants' phones get the same care: tapping 🎤 on the join page runs a sound check first (say a sentence; the phone shows the words
   heard, or why the microphone is not usable yet), the host sees ✓/!/✕ next to each phone, and a phone that goes silent during the meeting
   is warned and flagged to the host.
+- Pressing Start asks how this meeting should run: Live captions (what appears where, which model) or Record only (lightest, transcript
+  afterwards), with a recommendation when the box is already processing another meeting. Then the system check runs for that choice.

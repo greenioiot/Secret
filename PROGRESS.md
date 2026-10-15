@@ -635,3 +635,16 @@ and transcribed with correction by human afterward".
 - Tests (tools/tests): test_phone_mic.py 12/12 (speech ok + heard, short advice, 429, 404, silence fail, hello, host told of the sound
   status, silent 10 s -> notice + host flag, cleared again on sound, event logged), test_phone_mic_ui.py speech 10/10 and silence 5/5
   (headless Chrome on join.html with a WAV as microphone), the Round 50 tests re-run: host UI 15/15.
+
+## Round 52 (2026-10-15): Start asks how this meeting should run (live captions / record only)
+- Before: the Mode switch on the Record tab was a sticky setting (a click also changed the admin default for everyone), so the choice was
+  rarely made per meeting. Now pressing Start first shows "How should this meeting run? · การประชุมนี้ใช้โหมดไหน" with two option cards:
+  Live captions (sentences on this screen and on the joined phones a moment after they are said; the full transcript still afterwards; uses
+  the processor during the meeting; shows the live model, e.g. "Pathumma FastConformer (NECTEC) · CPU" and its fallback note) and
+  Record only (nothing shown live; transcript, speakers, summary afterwards; lightest; shows the after-meeting engine). The current default
+  (the switch) is highlighted ●; GET /api/engines (any signed-in user; no model is loaded) gives the names, the default, and "busy" =
+  a meeting being processed / recorded now -> "Recommended now: … so the processor is already busy" on the Record-only card. Cancel closes.
+- Choosing a card sets the switch (and, for an administrator, the default as before), then the system check runs for that mode and the
+  meeting starts as in Round 50. "Check system" and "Continue recording" (an interrupted meeting keeps its mode) do not ask.
+- Test tools/tests/test_mode_choice.py 12/12 (choice shown with both models, default highlighted, Cancel, Record only -> check -> meeting in
+  Record-only mode with the switch and the admin default updated, Check system unchanged). Screenshots at 1200 and 390 px looked right.

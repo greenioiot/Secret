@@ -122,6 +122,8 @@ mark{background:#fde04755;color:inherit;border-radius:3px;padding:0 1px}
 .pf .ck b{min-width:210px;font-weight:600}.pf .ck .ic{width:18px;flex:none;text-align:center;font-weight:700}
 .pf .ok .ic{color:var(--ok)}.pf .warn .ic{color:var(--warn)}.pf .fail .ic{color:var(--bad)}.pf .info .ic,.pf .run .ic{color:var(--mute)}
 .pf .fail b,.pf .fail span{color:var(--bad)}
+.pf .opts{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.pf .opt{flex:1 1 240px;text-align:left;border:2px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);color:var(--ink);font:inherit;cursor:pointer}
+.pf .opt:hover{border-color:var(--acc)}.pf .opt.cur{border-color:var(--acc)}.pf .opt b{display:block;font-size:15px}.pf .opt small{display:block;color:var(--mute);margin-top:3px;line-height:1.35}.pf .opt .rec{color:var(--ok);font-weight:600}
 .engs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.engs .eg{border:1px solid var(--line);border-radius:99px;padding:2px 10px;font-size:13px;background:var(--card)}
 .engs .eg i{font-style:normal;color:var(--mute);margin-right:4px}.engs .eg.on{border-color:var(--ok)}.engs .eg.warn{border-color:var(--warn)}
 @media (max-width:640px){.pf .ck{flex-wrap:wrap;gap:2px 10px}.pf .ck b{min-width:0}}
@@ -795,9 +797,31 @@ async function soundCheck(onTick) {   // a few seconds from the real microphone 
     const j = await r.json(); lastHeard = j.text || ""; return j.checks;
   } catch (e) { return [{ id: "sound", label: "Sound check", status: "fail", detail: "the sample could not be checked by the server: " + e.message }]; }
 }
+async function chooseMode() {   // pressed Start: this meeting with live captions, or record only? (the Record-tab switch is only the default)
+  let e = null; try { e = await api("/engines"); } catch {}
+  const box = $("#preflight"); box.classList.remove("hide");
+  return new Promise(resolve => {
+    const opt = (m, title, what, model) => el("button", { className: "opt" + (m === mode ? " cur" : ""), type: "button", onclick: () => { box.classList.add("hide"); resolve(m); } },
+      el("b", { textContent: (m === mode ? "● " : "○ ") + title }), el("small", { textContent: what }), model ? el("small", { textContent: model }) : "",
+      e && e.recommend === m ? el("small", { className: "rec", textContent: "Recommended now: " + e.busy + ", so the processor is already busy" }) : "");
+    box.replaceChildren(el("h3", { textContent: "How should this meeting run? · การประชุมนี้ใช้โหมดไหน" }),
+      el("div", { className: "opts" },
+        opt("live", "Live captions · คำบรรยายสด", "Sentences appear on this screen and on the phones that joined, a moment after they are said; the full transcript is still made afterwards. Uses the processor during the meeting.", e ? "Live model: " + e.live.name + (e.live.note ? " · " + e.live.note : "") : ""),
+        opt("after", "Record only · บันทึกอย่างเดียว", "Nothing is shown during the meeting; the transcript, speakers and summary are made afterwards. Lightest on the box and the safest choice when it is busy.", e ? "Transcript afterwards: " + e.after.uses : "")),
+      el("div", { className: "row", style: "gap:8px" }, el("button", { className: "btn", textContent: "Cancel", onclick: () => { box.classList.add("hide"); resolve(null); } }),
+        el("span", { className: "mute", style: "font-size:13px", textContent: "The highlighted one is the current default (the Mode switch above)." })));
+    box.scrollIntoView({ block: "center" });  // "nearest" leaves the heading under the sticky top bar
+  });
+}
 let pfRunning = false;
 async function preflight(thenStart) {
-  if (pfRunning) return; pfRunning = true;
+  if (pfRunning) return;
+  if (thenStart && !resumeFrom) {   // a fresh meeting: decide its mode first (a continued meeting keeps the mode it was started with)
+    const m = await chooseMode();
+    if (!m) return;
+    if (m !== mode) { setMode(m); if (isAdmin()) api("/settings", { method: "PUT", body: { mode: m } }).catch(() => {}); }
+  }
+  pfRunning = true;
   const btn = $("#recBtn"); if (thenStart) { btn.disabled = true; btn.innerHTML = "Checking…<br>กำลังตรวจ"; }
   const HEAD = "System check · ตรวจระบบก่อนเริ่ม", SRV = { label: "Server, worker, disk, models", status: "run", detail: "checking…" };
   renderPreflight([{ label: "Microphone", status: "run", detail: "listening for 1.5 s…" }, { label: "Sound check", status: "run", detail: "waits for the microphone…" }, SRV], HEAD);

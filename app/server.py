@@ -956,6 +956,19 @@ def api_status():
             "settings": {**store.settings(), "enroll_text_default": config.ENROLL_TEXT}}
 
 
+@app.get("/api/engines")
+def api_engines():
+    """For the choice made when Start is pressed (live captions or record only): which model each mode would use, without loading anything,
+    and whether the box is busy right now (processing a meeting shares the processor with live captions)."""
+    cfg = store.settings()
+    p = engines.plan(cfg, _ctc)
+    jobs = [m for m in store.list_meetings() if m.get("status") in ("transcribing", "analysing", "summarizing")]
+    others = [m for m in store.list_meetings() if m.get("status") == "recording"]
+    busy = (f"“{jobs[0].get('title') or jobs[0]['id']}” is being processed now ({jobs[0]['status']})" if jobs
+            else f"“{others[0].get('title') or others[0]['id']}” is being recorded now" if others else "")
+    return {**p, "default": cfg["mode"], "busy": busy, "recommend": "after" if busy else None}
+
+
 @app.get("/api/preflight")
 async def api_preflight(mode: str = "live"):
     """Checked before a meeting starts (Record tab): every part the meeting needs, each {id, label, status ok|warn|fail|info, detail}.
