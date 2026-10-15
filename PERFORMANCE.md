@@ -107,7 +107,7 @@ OpenAI-style API on the same 1440-token summary prompt): reads 550 tokens/s (fir
 call against 74 s on the CPU. But the Thai answer is poor: no figures, no names, the required headings ignored, a generic "หมายเหตุ" that the
 notes are fragmentary; the same with greedy decoding and with the system text folded into the user turn. An English prompt is answered
 correctly with the right headings, so the bundle's quantization (W4A16 with int16 embedding tables) costs Thai much more than the Q4_0 GGUF on
-the CPU, which answered the same prompt with every figure right. Not used; the files stay in models/geniex (CLI) and models/geniex-data (bundle).
+the CPU, which answered the same prompt with every figure right. Not used; the CLI and the bundle were removed again (PROGRESS.md has the install steps).
 
 What this means for you: Gemma 4 E4B is the best value now (correct figures, faster than both Typhoon models, no NPU dependence); the 30B is still the richest. With the 30B model, your real meetings took 650–660 s for the summary even when the meeting itself lasted 0.5–1 minute. The summary is by far the slowest step after a meeting.
 

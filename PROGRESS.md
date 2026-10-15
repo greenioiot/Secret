@@ -722,5 +722,5 @@ and transcribed with correction by human afterward".
 - Measured on the real 1440-token summary prompt of the 5.4-min meeting: prompt 550 tok/s, first token 2.6 s, 9.7 tok/s writing, 23-28 s per
   call (CPU GGUF: 74 s). Quality in Thai: vague, no figures or names, headings ignored, with a note that the notes are "fragmentary" — the same
   with greedy decoding and without a system role; an English prompt was answered correctly. The Q4_0 GGUF on the CPU gets the same Thai prompt
-  right, so the AI Hub quantization is the loss. Decision: not used; Gemma stays on the CPU (PERFORMANCE.md §4). The ~10 GB can be removed with
-  `rm -rf models/geniex models/geniex-data ~/.local/bin/geniex` if the space is wanted.
+  right, so the AI Hub quantization is the loss. Decision: not used; Gemma stays on the CPU (PERFORMANCE.md §4). The CLI, the bundle, the
+  launcher and ~/.cache/geniex were removed the same day (10 GB freed); the steps above reinstall it if a better bundle appears.
