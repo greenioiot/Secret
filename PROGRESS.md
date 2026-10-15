@@ -617,3 +617,21 @@ and transcribed with correction by human afterward".
   55 % in Record-only, heard text in the status, track watched, microphone replaced, stop), silence 2/2 (banner within 8 s).
   The WAV samples (6 s of a real meeting + 6 s of silence) are not in the repository: tools/tests/*.py take the folder as an argument.
 - Not done: a timed check before a planned meeting (plans have no start time); the join phones' microphones are not watched.
+
+## Round 51 (2026-10-15): the join phones' microphones are checked and watched too
+- join.html: tapping 🎤 no longer puts the phone's microphone live at once. The page asks "🎤 Say a short sentence now" with a level bar and
+  a 4-s countdown, captures those seconds through the same worklet path, then POST /join/<token>/sound?name= (public like the other
+  /join/* paths: the open join link is the key; 404 after 1 s for a wrong one; one check per device address + name every 5 s -> 429;
+  15 s max). The server runs the same sound_report() as the host's check (phone=True: short advice, no engine names). Silent -> the
+  microphone stays off with the reason ("✕ silent … Is the phone's microphone muted or covered? · Fix it and tap 🎤 again"); warnings are
+  shown but the microphone goes live; ok -> "✓ Sound check passed · heard “…” · Your microphone is on…". After the countdown the page says
+  "⏳ Checking the sound…" (the first check after the app starts loads the model: ~15 s). The phone then tells its socket
+  {"type":"sound","status"} and the host's join panel shows 🎤✓ / 🎤! / 🎤✕ next to the name.
+- Watchdog per phone: the guest handler's watch task (every 5 s) warns the phone ("⚠ No sound from your microphone for N s: is it muted
+  or covered? Keep this page open and the phone near you."), logs it in the meeting's history and marks the guest silent in the host's panel
+  ("⚠ no sound" next to the name + "⚠ 1 phone silent: ask them to check the microphone"); sound again clears both. The phone's track is
+  watched: system mute -> warning, unmute -> cleared, track ended -> the microphone is turned off with "tap 🎤 to use it again".
+  The host's Record tab now also takes the server's "guests" pushes (before: polling only).
+- Tests (tools/tests): test_phone_mic.py 12/12 (speech ok + heard, short advice, 429, 404, silence fail, hello, host told of the sound
+  status, silent 10 s -> notice + host flag, cleared again on sound, event logged), test_phone_mic_ui.py speech 10/10 and silence 5/5
+  (headless Chrome on join.html with a WAV as microphone), the Round 50 tests re-run: host UI 15/15.

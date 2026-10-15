@@ -740,6 +740,7 @@ function connect() {
       $("#meter").style.width = m.db == null ? "0" : Math.max(0, Math.min(100, (m.db + 60) * 2)) + "%";
     } else if (m.type === "caption") addCap(m);
     else if (m.type === "notice") recWarn(m.clear ? "" : "⚠ " + m.message);
+    else if (m.type === "guests") { if (m.open) renderJoin(m); }
     else if (m.type === "partial") setPartial(m);
     else if (m.type === "error") { $("#recMsg").textContent = "⚠ " + m.message; if (!meetingId) { endLocal(); resumeFrom = null; } }
     else if (m.type === "bot") botPush(m);
@@ -934,7 +935,9 @@ function renderJoin(j) {
   if (!j.open) { box.classList.add("hide"); box.replaceChildren(); return; }
   box.classList.remove("hide");
   const nMic = j.guests.filter(g => g.mic).length;
-  const guestsText = j.guests.length ? `${j.guests.length} joined: ` + j.guests.map(g => g.name + (g.mic ? " 🎤" : "")).join(", ") + (nMic ? ` · 🎤 ${nMic} sending their own microphone` : "") : "Nobody has joined yet.";
+  const SND = { ok: "✓", warn: "!", fail: "✕" }, nSilent = j.guests.filter(g => g.mic && g.silent).length;
+  const guestsText = j.guests.length ? `${j.guests.length} joined: ` + j.guests.map(g => g.name + (g.mic ? " 🎤" + (g.sound ? SND[g.sound] : "") + (g.silent ? " ⚠ no sound" : "") : "")).join(", ")
+    + (nMic ? ` · 🎤 ${nMic} sending their own microphone (🎤✓ passed the sound check)` : "") + (nSilent ? ` · ⚠ ${nSilent} phone${nSilent > 1 ? "s" : ""} silent: ask them to check the microphone` : "") : "Nobody has joined yet.";
   box.replaceChildren(el("div", { className: "row", style: "align-items:center" }, el("span", { className: "tag on", textContent: "● Joining is open: the QR code beside Stop connects to this meeting" }),
     el("button", { className: "btn", textContent: "Stop joining", onclick: () => { $("#recJoin").checked = false; joinSet(false); renderRecQr(); } })),
     el("div", { id: "joinGuests", style: "margin-top:8px", textContent: guestsText }));

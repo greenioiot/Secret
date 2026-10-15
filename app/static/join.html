@@ -125,6 +125,7 @@ function connect() {
     else if (m.type === "info") { $("#status").textContent = m.message; setTimeout(() => { if ($("#live").classList.contains("on")) $("#status").textContent = "Live · listening"; }, 4000); }
     else if (m.type === "count") $("#count").textContent = "Joined: " + m.n;
     else if (m.type === "mic") { if (!m.on) { micStop(); micMsg(m.message || "Your microphone is not used.", true); } }
+    else if (m.type === "notice") { if (mic) { if (m.clear) micInfoNormal(); else micMsg("⚠ " + m.message, true); } }
     else if (m.type === "ended" || m.type === "closed") { ended = true; micStop(); $("#status").textContent = m.type === "ended" ? "The meeting has ended. Thank you!" : "The host closed joining."; $("#live").classList.remove("on");
       if (room) setTimeout(() => { if (name && !$("#view").classList.contains("hide")) waitFor("Waiting for the next meeting…"); }, 15000); }
     else if (m.type === "error" && m.code === "waiting") { ended = true; waitFor(m.message); }
@@ -146,13 +147,50 @@ $("#name").onkeydown = e => { if (e.key === "Enter") $("#go").click(); };
 $("#leave").onclick = () => { micStop(); clearTimeout(waitT); ended = true; sock && sock.close(); $("#view").classList.add("hide"); $("#join").classList.remove("hide"); $("#live").classList.remove("on"); $("#title").textContent = "Secrets"; $("#count").textContent = ""; };
 /* ---------- my own microphone (optional) ---------- */
 let mic = null;  // { stream, ctx, node, buf, n, lock }
+const SOUND_CHECK_S = 4;
 function micMsg(t, bad) { const e = $("#micInfo"); e.classList.toggle("hide", !t); e.classList.toggle("err", !!bad); e.replaceChildren(); if (t) e.append(t); }
+function micInfoNormal(prefix) {   // the usual line while the microphone is on (+ a level bar); prefix = the sound check's result, shown first
+  const info = document.createElement("span"); info.textContent = (prefix ? prefix + " · " : "") + "Your microphone is on: your words go into the meeting transcript under your name. Keep this page open and the phone near you.";
+  const lvl = document.createElement("span"); lvl.className = "lvl"; lvl.append(document.createElement("i")); info.append(lvl);
+  micMsg(info, false);
+}
+async function soundCheck(node) {   // a few seconds through the same path as the meeting; the server measures them and runs the speech model
+  const chunks = []; let peak = 0;
+  node.port.onmessage = e => { chunks.push(e.data); let p = 0; for (const x of new Int16Array(e.data)) { const ax = Math.abs(x); if (ax > p) p = ax; } peak = p / 32768; };
+  const t0 = Date.now(), DUR = SOUND_CHECK_S * 1000;
+  while (Date.now() - t0 < DUR) {
+    await new Promise(r => setTimeout(r, 100)); if (!mic) return null;
+    const db = peak > 0 ? 20 * Math.log10(peak) : -120, n = Math.max(0, Math.min(10, Math.round((db + 60) / 5)));
+    micMsg(`🎤 Say a short sentence now · พูดประโยคสั้น ๆ  ${"█".repeat(n)}${"░".repeat(10 - n)}  ${Math.ceil((DUR - (Date.now() - t0)) / 1000)} s`, false);
+  }
+  node.port.onmessage = null;
+  micMsg("⏳ Checking the sound… (the first check after the app starts can take 15 s)", false);
+  let r;
+  try { r = await fetch(location.pathname.replace(/\/$/, "") + "/sound?name=" + encodeURIComponent(name), { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: new Blob(chunks) }); }
+  catch (e) { throw Object.assign(new Error("no connection to the meeting"), { sound: true }); }
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw Object.assign(new Error(m), { sound: true }); }
+  return r.json();
+}
 async function micStart() {
   try {
+    $("#mic").textContent = "⏳ Checking…"; $("#mic").disabled = true;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const ctx = new AudioContext(); await ctx.resume(); await ctx.audioWorklet.addModule("/static/pcm-worklet.js");
     const node = new AudioWorkletNode(ctx, "pcm-downsampler"); ctx.createMediaStreamSource(stream).connect(node);
     mic = { stream, ctx, node, buf: new Int16Array(1600), n: 0, lock: null };
+    const chk = await soundCheck(node);   // the microphone only goes live when sound and speech really arrive
+    if (!mic) return;
+    $("#mic").disabled = false;
+    if (!chk) { micStop(); return; }
+    const worst = chk.checks.some(c => c.status === "fail") ? "fail" : chk.checks.some(c => c.status === "warn") ? "warn" : "ok";
+    const lines = chk.checks.filter(c => c.status !== "info").map(c => (c.status === "ok" ? "✓ " : c.status === "warn" ? "! " : "✕ ") + c.detail);
+    if (worst === "fail") { micStop(); micMsg("Your microphone is not used yet: " + lines.join(" · ") + " · Fix it and tap 🎤 again.", true); return; }
+    if (sock && sock.readyState === 1) sock.send(JSON.stringify({ type: "sound", status: worst }));
+    micInfoNormal((worst === "ok" ? "✓ Sound check passed" : "! Sound check: ") + (worst === "ok" ? "" : lines.join(" · ")) + (chk.text ? ` · heard “${chk.text.slice(0, 60)}”` : ""));
+    const tr = stream.getAudioTracks()[0];   // the phone's microphone while it is on: muted by the system / taken by a call -> warning; gone -> off
+    tr.onmute = () => { if (mic) micMsg("⚠ The microphone stopped delivering sound (muted by the phone, or taken by a call).", true); };
+    tr.onunmute = () => { if (mic) micInfoNormal(); };
+    tr.onended = () => { if (mic) { micStop(); micMsg("⚠ Your microphone was disconnected: tap 🎤 to use it again.", true); } };
     node.port.onmessage = e => {  // 20 ms frames -> 100 ms messages
       const f = new Int16Array(e.data); mic.buf.set(f, mic.n); mic.n += f.length;
       if (mic.n >= mic.buf.length) {
@@ -164,13 +202,11 @@ async function micStart() {
     };
     try { mic.lock = await navigator.wakeLock.request("screen"); } catch {}
     $("#mic").textContent = "🎤 Stop my microphone"; $("#mic").classList.add("on");
-    const info = document.createElement("span"); info.textContent = "Your microphone is on: your words go into the meeting transcript under your name. Keep this page open and the phone near you.";
-    const lvl = document.createElement("span"); lvl.className = "lvl"; lvl.append(document.createElement("i")); info.append(lvl);
-    micMsg(info, false);
-  } catch (e) { micStop(); micMsg("The microphone could not be used: " + (e.message || e) + ". Allow microphone access for this page in the browser.", true); }
+  } catch (e) { micStop(); micMsg(e.sound ? "The sound check could not run: " + e.message + " Tap 🎤 to try again." : "The microphone could not be used: " + (e.message || e) + ". Allow microphone access for this page in the browser.", true); }
 }
 function micStop() {
-  if (!mic) return;
+  $("#mic").disabled = false;
+  if (!mic) { $("#mic").textContent = "🎤 Use my microphone"; $("#mic").classList.remove("on"); return; }
   try { mic.stream.getTracks().forEach(t => t.stop()); mic.ctx.close(); if (mic.lock) mic.lock.release(); } catch {}
   mic = null; $("#mic").textContent = "🎤 Use my microphone"; $("#mic").classList.remove("on"); micMsg("");
 }

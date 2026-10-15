@@ -1038,9 +1038,13 @@ async def api_preflight_sound(request: Request, mode: str = "live"):
     raw = await request.body()
     if len(raw) > 2 * config.SR * 15:
         raise HTTPException(413, "sample too long (15 s at most)")
-    pcm = np.frombuffer(raw[: len(raw) & ~1], np.int16)
     cfg = store.settings()
-    mode = mode if mode in ("live", "after") else cfg["mode"]
+    return await sound_report(np.frombuffer(raw[: len(raw) & ~1], np.int16), cfg, mode if mode in ("live", "after") else cfg["mode"])
+
+
+async def sound_report(pcm: np.ndarray, cfg: dict, mode: str, phone: bool = False) -> dict:
+    """The two items of a sound check ("Sound check": level / noise / speech; "Speech recognised": the live model on the sample), for the
+    host's microphone before a meeting and for a participant's phone when they turn their microphone on (phone=True: shorter advice)."""
     checks, text, ms, eng = [], "", 0, None
 
     def add(id_, label, status, detail):
@@ -1052,7 +1056,7 @@ async def api_preflight_sound(request: Request, mode: str = "live"):
         return {"status": "fail", "checks": checks, "stats": st, "text": ""}
     lvl = f"speech {st['speech_db']:.0f} dB · room noise {st['noise_db']:.0f} dB · {st['snr_db']:.0f} dB above the noise"
     if st["peak_db"] < -60:
-        add("sound", "Sound check", "fail", f"silent (peak {st['peak_db']:.0f} dB): nothing reaches the app. Is the microphone muted, or is another one chosen in Settings?")
+        add("sound", "Sound check", "fail", f"silent (peak {st['peak_db']:.0f} dB): nothing reaches the app. " + ("Is the phone's microphone muted or covered?" if phone else "Is the microphone muted, or is another one chosen in Settings?"))
     elif st["speech_s"] < 0.5 and st["speech_db"] - st["noise_db"] >= 10:
         add("sound", "Sound check", "warn", f"too quiet ({lvl}): speech at {st['speech_db']:.0f} dB is below the level the app listens for. Move closer to the microphone or raise its gain")
     elif st["speech_s"] < 0.5:
@@ -1074,13 +1078,14 @@ async def api_preflight_sound(request: Request, mode: str = "live"):
             ms = int((time.time() - t0) * 1000)
             text = asr.polish(text or "", cfg).strip()
             p = engines.plan(cfg, eng)
-            after = f" · the transcript after the meeting is made by {p['after']['uses']}" if mode != "live" and p["after"]["uses"] not in p["live"]["name"] else ""
+            after = f" · the transcript after the meeting is made by {p['after']['uses']}" if mode != "live" and not phone and p["after"]["uses"] not in p["live"]["name"] else ""
             if text:
-                add("speech", "Speech recognised", "ok", f"heard: “{text[:100]}” ({p['live']['name']} · {ms} ms){after}")
+                add("speech", "Speech recognised", "ok", f"heard: “{text[:100]}”" + ("" if phone else f" ({p['live']['name']} · {ms} ms)") + after)
             else:
-                add("speech", "Speech recognised", "warn", f"sound arrived but no words were recognised ({p['live']['name']} · {ms} ms): speak closer and clearly, or check that the right microphone is chosen{after}")
+                add("speech", "Speech recognised", "warn", "sound arrived but no words were recognised" + ("" if phone else f" ({p['live']['name']} · {ms} ms)") +
+                    (": hold the phone closer and speak clearly" if phone else ": speak closer and clearly, or check that the right microphone is chosen") + after)
         except Exception as e:  # noqa: BLE001
-            add("speech", "Speech recognised", "fail", f"the speech model could not run ({type(e).__name__}: {str(e)[:120]}): restart the app, or choose another live caption model in Settings")
+            add("speech", "Speech recognised", "fail", f"the speech model could not run ({type(e).__name__}: {str(e)[:120]})" + ("" if phone else ": restart the app, or choose another live caption model in Settings"))
     else:
         add("speech", "Speech recognised", "info", "not tested (nothing was said)")
     worst = "fail" if any(c["status"] == "fail" for c in checks) else "warn" if any(c["status"] == "warn" for c in checks) else "ok"
@@ -2513,12 +2518,18 @@ async def guest_audio(mid: str, gid: int, name: str, phone: dict, data: bytes, q
             await queue.put({"type": "mic", "on": False, "message": why})
             return
         t = mics.Track(mid, f"g{gid}", name, a["pos"]() - (len(data) // 2) / config.SR)
-        phone.update(track=t, seg=mics_segmenter(a["cfg"]), gate=mics.LiveGate(), n=itertools.count(1))
+        phone.update(track=t, seg=mics_segmenter(a["cfg"]), gate=mics.LiveGate(), n=itertools.count(1), quiet_since=time.time())
         a["tracks"][t.id] = t
         store.log_event(mid, f"{name} turned on their own microphone")
         await queue.put({"type": "mic", "on": True})
         broadcast_host(mid)
     t = phone["track"]
+    if peak_db(data) > SOUND_DB:  # the no-sound watchdog of this phone (see ws_join's watch)
+        phone["quiet_since"] = time.time()
+        if phone.get("room", {}).get("silent"):
+            phone["room"]["silent"] = False
+            await queue.put({"type": "notice", "kind": "silent", "clear": True})
+            broadcast_host(mid)
     pad = t.write(data, a["pos"]())
     if pad is None or a["mode"] != "live":
         return
@@ -2624,7 +2635,8 @@ def _join_payload(mid: str) -> dict:
     ips = lan_ips()
     return {"enabled": store.settings()["allow_join"], "open": live, "recording": mid in active,
             "urls": room_urls() if live else [],  # the room link (the same QR before, during and after the meeting)
-            "guests": [{"name": g["name"], "since": g["since"], "mic": f"g{k}" in (active.get(mid, {}).get("tracks") or {})} for k, g in GUESTS.get(mid, {}).items()],
+            "guests": [{"name": g["name"], "since": g["since"], "mic": f"g{k}" in (active.get(mid, {}).get("tracks") or {}), "sound": g.get("sound"), "silent": bool(g.get("silent"))}
+                       for k, g in GUESTS.get(mid, {}).items()],
             "max": capacity.limits(store.settings())["max_guests"],
             "capacity": capacity.plan(store.settings(), len(GUESTS.get(mid, {})), mid in active, _bot_wants_llm())}
 
@@ -2717,6 +2729,31 @@ def join_page(token: str):
     return FileResponse(HERE / "static/join.html", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
+SOUND_LAST: dict[tuple, float] = {}  # (device address, name) -> time of its last phone sound check (one every 5 s at most)
+
+
+@app.post("/join/{token}/sound")
+async def join_sound(token: str, request: Request, name: str = ""):
+    """A participant's phone, before its microphone goes live: a few seconds of audio through the same path as the meeting, measured and
+    recognised like the host's sound check (needs an open join link of a meeting being recorded)."""
+    mid = open_meeting_for(token)
+    if not mid:
+        await asyncio.sleep(1.0)
+        raise HTTPException(404, "This meeting is not open for joining.")
+    key = (request.client.host if request.client else "?", clean_guest_name(name))
+    now = time.time()
+    if now - SOUND_LAST.get(key, 0.0) < 5:
+        raise HTTPException(429, "Please wait a few seconds before checking again.")
+    SOUND_LAST[key] = now
+    for k in [k for k, v in SOUND_LAST.items() if now - v > 600]:
+        SOUND_LAST.pop(k, None)
+    raw = await request.body()
+    if len(raw) > 2 * config.SR * 15:
+        raise HTTPException(413, "sample too long (15 s at most)")
+    a = active.get(mid) or {}
+    return await sound_report(np.frombuffer(raw[: len(raw) & ~1], np.int16), store.settings(), a.get("mode") or "live", phone=True)
+
+
 @app.get("/join/{token}/qr.svg")
 async def join_qr(token: str, request: Request):
     """The QR code of this join link, shown on a participant's page so the people next to them can scan it and join too (public like the page;
@@ -2783,7 +2820,16 @@ async def ws_join(ws: WebSocket):
 
     last_ask = [0.0]
 
-    phone = {}  # this participant's own microphone, when they turn it on (mics.py)
+    phone = {"room": room[gid]}  # this participant's own microphone, when they turn it on (mics.py)
+
+    async def watch():  # the phone's microphone went quiet (muted, covered, the page in the background): tell the phone and the host
+        while True:
+            await asyncio.sleep(5)
+            if phone.get("track") and not room[gid].get("silent") and time.time() - phone.get("quiet_since", time.time()) > SILENT_WARN_S:
+                room[gid]["silent"] = True
+                store.log_event(mid, f"no sound from {name}'s microphone for {int(time.time() - phone['quiet_since'])} s")
+                await queue.put({"type": "notice", "kind": "silent", "message": f"No sound from your microphone for {int(time.time() - phone['quiet_since'])} s: is it muted or covered? Keep this page open and the phone near you."})
+                broadcast_host(mid)
 
     async def listen():  # reading detects the disconnect; a guest may also ask the bot when the host allows it
         while True:
@@ -2798,6 +2844,10 @@ async def ws_join(ws: WebSocket):
                     j = json.loads(msg["text"])
                 except ValueError:
                     continue
+                if j.get("type") == "sound":  # the phone's own sound check result (shown to the host next to the name)
+                    room[gid]["sound"] = j.get("status") if j.get("status") in ("ok", "warn", "fail") else None
+                    broadcast_host(mid)
+                    continue
                 b = BOTS.get(mid)
                 if GUEST_CAN_ASK and j.get("type") == "ask" and b and b["bot"].cfg["guest_questions"]:
                     if time.time() - last_ask[0] < 45:
@@ -2808,9 +2858,9 @@ async def ws_join(ws: WebSocket):
                         last_ask[0] = time.time()
                         asyncio.get_running_loop().create_task(b["bot"].ask(str(j.get("text", ""))[:300], name))
 
-    tasks = [asyncio.create_task(pump()), asyncio.create_task(listen())]
+    tasks = [asyncio.create_task(pump()), asyncio.create_task(listen()), asyncio.create_task(watch())]
     try:
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        await asyncio.wait(tasks[:2], return_when=asyncio.FIRST_COMPLETED)
     except Exception:  # noqa: BLE001
         pass
     finally:

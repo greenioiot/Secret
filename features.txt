@@ -149,3 +149,6 @@ messages.
   silent or muted microphone cannot start a meeting; a quiet or noisy one gets a warning with what to do.
 - During the meeting the app watches the microphone: no sound for a minute -> a red warning under the timer (and in the meeting's history);
   an unplugged USB microphone is replaced by the default one at once and the recording goes on; the level meter also works in Record-only mode.
+- Participants' phones get the same care: tapping 🎤 on the join page runs a sound check first (say a sentence; the phone shows the words
+  heard, or why the microphone is not usable yet), the host sees ✓/!/✕ next to each phone, and a phone that goes silent during the meeting
+  is warned and flagged to the host.
