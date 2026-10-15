@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Enrolment guide · Secrets</title>
+<title>Enrolment guide · Zecrets</title>
 <link rel="stylesheet" href="/static/fonts.css">
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--fs:20px}
@@ -34,10 +34,10 @@ main{flex:1;display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:20px;
 .hide{display:none!important}
 </style>
 <link rel="stylesheet" href="/static/theme.css">
-<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<script>try { const t = localStorage.getItem("zecrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
-<header><b id="title">Secrets · ลงทะเบียนเสียง / Voice enrolment</b>
+<header><b id="title">Zecrets · ลงทะเบียนเสียง / Voice enrolment</b>
   <span class="seg" id="langSeg"><button data-l="th">ไทย</button><button data-l="both">ไทย+EN</button><button data-l="en">EN</button></span>
   <button class="btn" id="smaller" aria-label="Smaller text">A−</button><button class="btn" id="bigger" aria-label="Larger text">A+</button>
   <button class="btn hide" id="speak">🔊</button><button class="btn" id="full">⛶</button></header>
@@ -56,12 +56,12 @@ main{flex:1;display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:20px;
 const $ = s => document.querySelector(s);
 let G = null, userMode = "", ri = 0, fs = 20, qrSig = "";
 const effMode = () => userMode || (G ? (G.lang_pref === "th" ? "th" : G.lang_pref === "en" ? "en" : "both") : "both");
-try { fs = +localStorage.getItem("secrets.guideFs") || 20; userMode = localStorage.getItem("secrets.guideLang") || ""; } catch {}
-const setFs = d => { fs = Math.max(14, Math.min(40, fs + d)); document.documentElement.style.setProperty("--fs", fs + "px"); try { localStorage.setItem("secrets.guideFs", fs); } catch {} };
+try { fs = +localStorage.getItem("zecrets.guideFs") || 20; userMode = localStorage.getItem("zecrets.guideLang") || ""; } catch {}
+const setFs = d => { fs = Math.max(14, Math.min(40, fs + d)); document.documentElement.style.setProperty("--fs", fs + "px"); try { localStorage.setItem("zecrets.guideFs", fs); } catch {} };
 setFs(0);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); kids.flat().forEach(k => e.append(k)); return e; };
 const langs = () => { const m = effMode(); return m === "both" ? ["th", "en"] : [m]; };
-function setMode(m) { userMode = m; try { localStorage.setItem("secrets.guideLang", m); } catch {} render(); showMsg(false); }
+function setMode(m) { userMode = m; try { localStorage.setItem("zecrets.guideLang", m); } catch {} render(); showMsg(false); }
 document.querySelectorAll("#langSeg button").forEach(b => b.onclick = () => setMode(b.dataset.l));
 $("#bigger").onclick = () => setFs(2); $("#smaller").onclick = () => setFs(-2);
 $("#full").onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); };
@@ -76,7 +76,7 @@ function render() {
   if (sig !== qrSig) { qrSig = sig; $("#qrBox").replaceChildren(url ? el("img", { className: "qr", alt: "QR", src: "/api/enroll-qr.svg?i=0&k=" + encodeURIComponent(url.slice(-12)) }) : el("div", { className: "small", textContent: "—" })); }
   $("#link").textContent = url || (G.app_urls[0] || "");
   $("#appline").textContent = (langs()[0] === "th" ? "ที่อยู่ของระบบ: " : "System address: ") + (G.app_urls || []).join("   ") + (G.wifi ? "   ·   Wi-Fi: " + G.wifi : "");
-  $("#av").textContent = (G.name || "?").slice(0, 1); const em = effMode(); document.querySelectorAll("#langSeg button").forEach(b => b.classList.toggle("on", b.dataset.l === em)); $("#title").textContent = "Secrets · " + (em === "en" ? "Voice enrolment" : "ลงทะเบียนเสียง" + (em === "both" ? " / Voice enrolment" : ""));
+  $("#av").textContent = (G.name || "?").slice(0, 1); const em = effMode(); document.querySelectorAll("#langSeg button").forEach(b => b.classList.toggle("on", b.dataset.l === em)); $("#title").textContent = "Zecrets · " + (em === "en" ? "Voice enrolment" : "ลงทะเบียนเสียง" + (em === "both" ? " / Voice enrolment" : ""));
   const left = Math.max(0, G.expires_in), chips = [];
   chips.push(el("span", { className: "chip " + (open ? "ok" : "warn"), textContent: open ? `Link open ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "Link closed" }));
   chips.push(el("span", { className: "chip" + (G.pending.length ? " warn" : ""), textContent: G.pending.length ? "Waiting for the host: " + G.pending.join(", ") : "No one waiting" }));

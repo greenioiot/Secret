@@ -3,7 +3,7 @@ import sys, wave, numpy as np, httpx
 S = sys.argv[1]; B = "https://127.0.0.1:8445"
 c = httpx.Client(base_url=B, verify=False, timeout=120, headers={"Origin": B})
 r = c.post("/api/auth/login", json={"username": "boss", "password": "adminpassword123"}); assert r.status_code == 200, r.text
-csrf = c.cookies.get("secret_csrf"); H = {"X-CSRF-Token": csrf, "Content-Type": "application/octet-stream"}
+csrf = c.cookies.get("zecret_csrf"); H = {"X-CSRF-Token": csrf, "Content-Type": "application/octet-stream"}
 ok = fail = 0
 def check(name, cond, info=""):
     global ok, fail
@@ -45,6 +45,6 @@ c.post("/api/users", headers={"X-CSRF-Token": csrf}, json={"username": "view", "
 for u, p, want in (("mem", "memberpassword123", 200), ("view", "viewerpassword123", 403)):
     c2 = httpx.Client(base_url=B, verify=False, timeout=120, headers={"Origin": B}); r = c2.post("/api/auth/login", json={"username": u, "password": p})
     if r.status_code != 200: print("   (user create/login", u, r.status_code, r.text[:80], ")")
-    r = c2.post("/api/preflight/sound", headers={"X-CSRF-Token": c2.cookies.get("secret_csrf") or "", "Content-Type": "application/octet-stream"}, content=speech.tobytes())
+    r = c2.post("/api/preflight/sound", headers={"X-CSRF-Token": c2.cookies.get("zecret_csrf") or "", "Content-Type": "application/octet-stream"}, content=speech.tobytes())
     check(f"{u}: sound check -> {want}", r.status_code == want, str(r.status_code))
 print(f"\n{ok} passed, {fail} failed")

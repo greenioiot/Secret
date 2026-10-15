@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Secrets (web app + worker). Logs: data/server.log, data/worker.log. Access code: data/access.token
+# Start Zecrets (web app + worker). Logs: data/server.log, data/worker.log. Access code: data/access.token
 cd "$(dirname "$0")" && mkdir -p data
 while true; do
   # a log that grew past 100 MB is set aside (one old copy kept): a runaway error once wrote 5.7 GB in under an hour

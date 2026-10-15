@@ -31,8 +31,8 @@ THERMAL = sorted(Path("/sys/class/thermal").glob("thermal_zone*/temp"))
 # live meeting 1.25 % CPU. Margins ~1.5x.
 COST = {"guest_mb": 0.5, "guest_cpu_pct": 0.002, "live_cpu_pct": 2.0, "bot_llm_gb": 4.0, "bot_embed_gb": 0.55, "post_gb": 4.5,
         "enroll_cpu_pct": 12.0}
-LABELS = (("uvicorn server:app", "Genie Edge app"), ("llama-server", "llama.cpp server"), ("app/worker.py", "Secrets worker"), ("worker.py", "Secrets worker"),
-          ("app/server.py", "Secrets web"), ("chrome", "Chrome"), ("claude", "Claude Code"))
+LABELS = (("uvicorn server:app", "Genie Edge app"), ("llama-server", "llama.cpp server"), ("app/worker.py", "Zecrets worker"), ("worker.py", "Zecrets worker"),
+          ("app/server.py", "Zecrets web"), ("chrome", "Chrome"), ("claude", "Claude Code"))
 
 
 def _read_stat() -> list[tuple[int, int]]:
@@ -80,9 +80,9 @@ BOT_LLM_PORT = config.LLM_PORT + 1  # keep in step with bot.LLM_PORT
 
 def _label(cmd: str) -> str:
     if "llama-server" in cmd and f"--port {BOT_LLM_PORT} " in cmd + " ":
-        return "Secrets bot LLM (llama.cpp)"
+        return "Zecrets bot LLM (llama.cpp)"
     if "llama-server" in cmd and f"--port {config.LLM_PORT} " in cmd + " ":
-        return "Secrets summary LLM (llama.cpp)"
+        return "Zecrets summary LLM (llama.cpp)"
     for key, label in LABELS:
         if key in cmd:
             return label
@@ -101,7 +101,7 @@ def _temp_c() -> float | None:
     return round(best, 1) if best is not None else None
 
 
-GPU_DEVFREQ = "/sys/class/devfreq/3d00000.gpu"  # Adreno on this board (read only: Secrets never uses the GPU, Vulkan/Turnip hard-resets the box)
+GPU_DEVFREQ = "/sys/class/devfreq/3d00000.gpu"  # Adreno on this board (read only: Zecrets never uses the GPU, Vulkan/Turnip hard-resets the box)
 
 
 def _read(path: str) -> str | None:
@@ -123,7 +123,7 @@ def gpu_info(holders: list[dict]) -> dict:
                 pass
     return {"present": cur is not None, "freq_mhz": int(cur) // 1_000_000 if cur and cur.isdigit() else None, "max_mhz": int(mx) // 1_000_000 if mx and mx.isdigit() else None,
             "temp_c": round(max(temps), 1) if temps else None, "holders": holders, "state": "in use" if holders else "idle",
-            "note": "No load counter is exposed. Secrets never uses the GPU (it can hard-reset this board): this only shows which of your processes have it open, its clock and temperature."}
+            "note": "No load counter is exposed. Zecrets never uses the GPU (it can hard-reset this board): this only shows which of your processes have it open, its clock and temperature."}
 
 
 def disk_info() -> dict:
@@ -155,14 +155,14 @@ class Monitor(threading.Thread):
         self._ts = time.time()
         self._stat = _read_stat()
         self._npu_ticks: dict[tuple[int, int], int] = {}
-        self._procs: dict = {"top": [], "holders": [], "gpu_holders": [], "secrets": {}}
+        self._procs: dict = {"top": [], "holders": [], "gpu_holders": [], "zecrets": {}}
         self._procs_at = 0.0
         self._data = {"meetings_gb": None, "voices_mb": None, "at": 0.0}
 
     # -- processes (every ~6 s): memory users + who holds the NPU device
     def _scan(self):
         me, uid = os.getpid(), os.getuid()
-        top, holders, gpu, secrets = [], [], [], {"web_mb": 0.0, "worker_mb": 0.0, "llm_mb": 0.0, "bot_llm_mb": 0.0}
+        top, holders, gpu, zecrets = [], [], [], {"web_mb": 0.0, "worker_mb": 0.0, "llm_mb": 0.0, "bot_llm_mb": 0.0}
         for name in os.listdir("/proc"):
             if not name.isdigit():
                 continue
@@ -180,13 +180,13 @@ class Monitor(threading.Thread):
                 continue
             lab = _label(cmd)
             if pid == me:
-                lab, secrets["web_mb"] = "Secrets web", rss
-            elif lab == "Secrets worker":
-                secrets["worker_mb"] += rss
-            elif lab == "Secrets summary LLM (llama.cpp)":
-                secrets["llm_mb"] += rss
-            elif lab == "Secrets bot LLM (llama.cpp)":
-                secrets["bot_llm_mb"] += rss
+                lab, zecrets["web_mb"] = "Zecrets web", rss
+            elif lab == "Zecrets worker":
+                zecrets["worker_mb"] += rss
+            elif lab == "Zecrets summary LLM (llama.cpp)":
+                zecrets["llm_mb"] += rss
+            elif lab == "Zecrets bot LLM (llama.cpp)":
+                zecrets["bot_llm_mb"] += rss
             top.append({"pid": pid, "name": lab, "rss_mb": round(rss)})
             try:
                 links = [os.readlink(f"/proc/{pid}/fd/{fd}") for fd in os.listdir(f"/proc/{pid}/fd")]
@@ -197,9 +197,9 @@ class Monitor(threading.Thread):
             if any(x.startswith(("/dev/dri/renderD", "/dev/kgsl")) for x in links):
                 gpu.append({"pid": pid, "name": lab})
         top.sort(key=lambda p: -p["rss_mb"])
-        self._procs = {"top": top[:6], "holders": holders, "gpu_holders": gpu, "secrets": {k: round(v) for k, v in secrets.items()}}
+        self._procs = {"top": top[:6], "holders": holders, "gpu_holders": gpu, "zecrets": {k: round(v) for k, v in zecrets.items()}}
         self._procs_at = time.time()
-        if time.time() - self._data["at"] > 120:  # what Secrets keeps on disk (walking the folders costs a little: every 2 min)
+        if time.time() - self._data["at"] > 120:  # what Zecrets keeps on disk (walking the folders costs a little: every 2 min)
             self._data = {"meetings_gb": round(_tree_bytes(config.MEETINGS) / 1e9, 2), "voices_mb": round(_tree_bytes(config.VOICES) / 1e6, 1), "at": time.time()}
 
     def _npu(self, dt: float) -> dict:
@@ -238,7 +238,7 @@ class Monitor(threading.Thread):
                 mem = read_mem()
                 la = os.getloadavg()
                 self.latest = {"time": now, "cpu_pct": per[0], "per_core": per[1:], "cores": CORES, "load": [round(x, 2) for x in la], "temp_c": _temp_c(),
-                               "mem": mem, "npu": self._npu(dt), "procs": self._procs["top"], "secrets": self._procs["secrets"],
+                               "mem": mem, "npu": self._npu(dt), "procs": self._procs["top"], "zecrets": self._procs["zecrets"],
                                "gpu": gpu_info(self._procs["gpu_holders"]), "disk": {**disk_info(), "meetings_gb": self._data["meetings_gb"], "voices_mb": self._data["voices_mb"]}}
             except Exception:  # noqa: BLE001 - a bad sample must never stop the monitor
                 time.sleep(3)
@@ -250,7 +250,7 @@ class Monitor(threading.Thread):
             return s
         mem = read_mem()
         return {"time": time.time(), "cpu_pct": 0.0, "per_core": [], "cores": CORES, "load": [round(x, 2) for x in os.getloadavg()], "temp_c": _temp_c(), "mem": mem,
-                "npu": {"state": "unknown", "driver_pct": 0.0, "holders": [], "estimate": True, "note": ""}, "procs": [], "secrets": {}, "gpu": gpu_info([]), "disk": disk_info()}
+                "npu": {"state": "unknown", "driver_pct": 0.0, "holders": [], "estimate": True, "note": ""}, "procs": [], "zecrets": {}, "gpu": gpu_info([]), "disk": disk_info()}
 
 
 MONITOR = Monitor()
@@ -266,7 +266,7 @@ def plan(cfg: dict, guests: int = 0, recording: bool = False, bot_llm: bool = Fa
     s = snap or MONITOR.snapshot()
     L = limits(cfg)
     avail, cpu = s["mem"]["avail_gb"], s["cpu_pct"]
-    llm_up = s.get("secrets", {}).get("bot_llm_mb", 0) > 500  # the BOT's own model server (the summary worker's one is a different process)
+    llm_up = s.get("zecrets", {}).get("bot_llm_mb", 0) > 500  # the BOT's own model server (the summary worker's one is a different process)
     llm_need = COST["bot_llm_gb"] + COST["bot_embed_gb"] if (bot_llm and not llm_up) else 0.0
     ram_room = avail - L["reserve_gb"] - llm_need
     by_ram = max(0, int(ram_room * 1024 / COST["guest_mb"]))

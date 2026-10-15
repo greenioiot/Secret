@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Join · Secrets</title>
+<title>Join · Zecrets</title>
 <link rel="stylesheet" href="/static/fonts.css">
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--bad:#dc2626}
@@ -43,10 +43,10 @@ button.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);wi
 #qrBox .link{font-size:13px;color:var(--mute);overflow-wrap:anywhere;margin:4px 0 12px}
 </style>
 <link rel="stylesheet" href="/static/theme.css">
-<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<script>try { const t = localStorage.getItem("zecrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
-<header><span class="live" id="live"></span><h1 id="title">Secrets</h1><span class="mute" id="count"></span></header>
+<header><span class="live" id="live"></span><h1 id="title">Zecrets</h1><span class="mute" id="count"></span></header>
 <main>
   <div id="join" class="card">
     <h2 style="margin:0 0 4px;font-size:20px">Join the meeting · เข้าร่วมประชุม</h2>
@@ -79,7 +79,7 @@ let sock, name = "", ended = false, retry = 0, size = 22;
 const COLORS = ["#2f6fed", "#e11d48", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4d7c0f"];
 const hue = t => COLORS[[...String(t)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 const fmt = s => { s = Math.floor(s); return [s / 3600 | 0, s % 3600 / 60 | 0, s % 60].map(n => String(n).padStart(2, "0")).join(":"); };
-try { $("#name").value = localStorage.getItem("secrets.guestName") || ""; size = +localStorage.getItem("secrets.guestSize") || 22; } catch {}
+try { $("#name").value = localStorage.getItem("zecrets.guestName") || ""; size = +localStorage.getItem("zecrets.guestSize") || 22; } catch {}
 $("#caps").style.fontSize = size + "px";
 
 function setPartial(c) {
@@ -140,11 +140,11 @@ function connect() {
 }
 $("#go").onclick = () => {
   name = $("#name").value.trim(); if (!name) { fail("Please type your name."); return; }
-  try { localStorage.setItem("secrets.guestName", name); } catch {}
+  try { localStorage.setItem("zecrets.guestName", name); } catch {}
   $("#err").classList.add("hide"); ended = false; connect();
 };
 $("#name").onkeydown = e => { if (e.key === "Enter") $("#go").click(); };
-$("#leave").onclick = () => { micStop(); clearTimeout(waitT); ended = true; sock && sock.close(); $("#view").classList.add("hide"); $("#join").classList.remove("hide"); $("#live").classList.remove("on"); $("#title").textContent = "Secrets"; $("#count").textContent = ""; };
+$("#leave").onclick = () => { micStop(); clearTimeout(waitT); ended = true; sock && sock.close(); $("#view").classList.add("hide"); $("#join").classList.remove("hide"); $("#live").classList.remove("on"); $("#title").textContent = "Zecrets"; $("#count").textContent = ""; };
 /* ---------- my own microphone (optional) ---------- */
 let mic = null;  // { stream, ctx, node, buf, n, lock }
 const SOUND_CHECK_S = 4;
@@ -222,7 +222,7 @@ $("#qrClose").onclick = () => $("#qrBox").classList.add("hide");
 $("#qrBox").onclick = e => { if (e.target.id === "qrBox") $("#qrBox").classList.add("hide"); };
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("#qrBox").classList.add("hide"); });
 $("#qrCopy").onclick = async () => { try { await navigator.clipboard.writeText(location.origin + location.pathname); $("#qrCopy").textContent = "Copied ✓"; } catch { prompt("Copy this link", location.origin + location.pathname); } };
-const resize = d => { size = Math.max(14, Math.min(48, size + d)); $("#caps").style.fontSize = size + "px"; try { localStorage.setItem("secrets.guestSize", size); } catch {} };
+const resize = d => { size = Math.max(14, Math.min(48, size + d)); $("#caps").style.fontSize = size + "px"; try { localStorage.setItem("zecrets.guestSize", size); } catch {} };
 $("#bigger").onclick = () => resize(3); $("#smaller").onclick = () => resize(-3);
 </script>
 </body>

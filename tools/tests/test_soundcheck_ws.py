@@ -29,7 +29,7 @@ async def main():
                 pk = src[pos:pos + 320]; pos = (pos + 320) % max(320, len(src) - 320)
                 if len(pk) < 320: pk = np.zeros(320, np.int16)
                 await ws.send(pk.tobytes()); await asyncio.sleep(0.02)
-        await stream(np.zeros(320, np.int16), 10)       # 10 s of digital silence (SECRET_SILENT_S=3 on the scratch instance)
+        await stream(np.zeros(320, np.int16), 10)       # 10 s of digital silence (ZECRET_SILENT_S=3 on the scratch instance)
         n1 = len(got["notice"])
         await stream(speech, 6)                          # then speech
         await asyncio.sleep(0.5)

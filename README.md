@@ -1,4 +1,4 @@
-# Secrets – on-device Thai meeting recorder
+# Zecrets – on-device Thai meeting recorder
 
 Browser mic → crash-safe disk → live Thai captions → accurate transcript → Thai summary. Everything stays on this box.
 
@@ -39,7 +39,7 @@ Access code: Settings → Access code (or delete `data/access.token` and restart
   Whisper itself gets no prompt: any prompt makes this Thai model much worse (measured).
 
 ## Word collection and participants
-* **Word collection** (Settings): save "wrong word → right word"; applied to live captions (also what participants see) and to every transcript. Correct a word in any transcript line and Secrets offers to remember it (and fix the same word in the rest of that meeting). *Apply saved words* fixes an older transcript.
+* **Word collection** (Settings): save "wrong word → right word"; applied to live captions (also what participants see) and to every transcript. Correct a word in any transcript line and Zecrets offers to remember it (and fix the same word in the rest of that meeting). *Apply saved words* fixes an older transcript.
 * **Participants** who join over the network see only the live transcript (with speaker names and times). No bot messages, questions, summary or reports.
 * **How many participants?** Measured on this board: ~0.4 MB RAM and almost no CPU per participant; hundreds fit. The practical limit is the Wi-Fi access point; set it in Settings → Capacity & limits.
 

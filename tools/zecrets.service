@@ -1,8 +1,8 @@
-# Start Secrets at boot. Install (once):
-#   sudo cp /mnt/project2/Secret/tools/secrets.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable secrets
-# Stop any copy started by hand first (pkill -f run.sh from another shell), then: sudo systemctl start secrets
+# Start Zecrets at boot. Install (once):
+#   sudo cp /mnt/project2/Secret/tools/zecrets.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable zecrets
+# Stop any copy started by hand first (pkill -f run.sh from another shell), then: sudo systemctl start zecrets
 [Unit]
-Description=Secrets meeting recorder (web app + worker, port 8444)
+Description=Zecrets meeting recorder (web app + worker, port 8444)
 After=network-online.target cdsprpcd.service genie-edge.service
 Wants=network-online.target
 RequiresMountsFor=/mnt/project2

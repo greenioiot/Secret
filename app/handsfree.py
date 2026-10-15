@@ -23,9 +23,9 @@ NAME_PREFIX = re.compile(r"^(?:ผม|ฉัน|ดิฉัน|หนู|เร
 
 
 def wake_forms(name: str) -> list[str]:
-    """Spellings the Thai recogniser may write for the assistant's name (default "Secrets")."""
-    base = {"secrets": ["ซีเคร็ต", "ซีเคร็ท", "ซีเครท", "ซีเครต", "ซีเคร็ทส์", "ซีเคร็ตส์", "ซีเครทส์", "ซีกเร็ต", "ซิเคร็ต", "สีเคร็ด", "ซีเคร็ด", "secrets", "secret"],
-            "zecret": ["ซีเคร็ต", "ซีเคร็ท", "ซีเครท", "ซีกรีต", "zecret", "secret"]}
+    """Spellings the Thai recogniser may write for the assistant's name (default "Zecrets")."""
+    base = {"zecrets": ["ซีเคร็ต", "ซีเคร็ท", "ซีเครท", "ซีเครต", "ซีเคร็ทส์", "ซีเคร็ตส์", "ซีเครทส์", "ซีกเร็ต", "ซิเคร็ต", "สีเคร็ด", "ซีเคร็ด", "zecrets", "zecret"],
+            "zecret": ["ซีเคร็ต", "ซีเคร็ท", "ซีเครท", "ซีกรีต", "zecret", "zecret"]}
     k = name.strip().lower()
     return base.get(k, []) + ([k] if k not in base else [])
 
@@ -75,7 +75,7 @@ def extract_name(text: str) -> str | None:
     return t
 
 
-def parse(text: str, stage: str, wake_name: str = "Secrets", sensitivity: str = "normal") -> dict:
+def parse(text: str, stage: str, wake_name: str = "Zecrets", sensitivity: str = "normal") -> dict:
     """-> {"intent": ..., "score"?, "name"?}. Intents: cancel, wake_enroll, wake, enroll, yes, no, name, unknown."""
     text = (text or "").strip()
     thr = SENSITIVITY.get(sensitivity, 80)

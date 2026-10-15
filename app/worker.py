@@ -1116,7 +1116,7 @@ def main():
     try:
         os.nice(10)
         open("/proc/self/oom_score_adj", "w").write("800")  # if memory runs out, the worker dies first, not the recorder
-        cores = os.environ.get("SECRET_WORKER_CORES")  # tests: e.g. "4-7"
+        cores = os.environ.get("ZECRET_WORKER_CORES")  # tests: e.g. "4-7"
         lo, _, hi = (cores or f"0-{config.CORES - 1}").partition("-")
         os.sched_setaffinity(0, range(int(lo), int(hi or lo) + 1))  # the worker pauses while a meeting is being recorded and is nice 10, so it may use every core
     except OSError:

@@ -22,7 +22,7 @@ import config
 import store
 
 CFG_FILE = config.DATA / "smtp.json"
-DEFAULTS = {"enabled": False, "host": "", "port": 587, "security": "starttls", "username": "", "password": "", "from_name": "Secrets",
+DEFAULTS = {"enabled": False, "host": "", "port": 587, "security": "starttls", "username": "", "password": "", "from_name": "Zecrets",
             "from_addr": "", "default_to": [], "verify_cert": True, "auto_send": False,
             "attach_summary": True, "attach_report": True, "attach_transcript": False}
 SECURITY = ("starttls", "ssl", "none")
@@ -175,7 +175,7 @@ def send(to: list[str], subject: str, text: str, html_body: str | None = None, a
         raise ValueError("Set a valid From address in Settings → Email.")
     msg = EmailMessage()
     msg["Subject"] = " ".join(subject.split())[:200]          # no line breaks: no header injection
-    msg["From"] = formataddr((" ".join((cfg["from_name"] or "Secrets").split())[:60], sender))
+    msg["From"] = formataddr((" ".join((cfg["from_name"] or "Zecrets").split())[:60], sender))
     msg["To"] = ", ".join(to)
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain=sender.split("@")[-1])
@@ -198,8 +198,8 @@ def send(to: list[str], subject: str, text: str, html_body: str | None = None, a
 def send_test(to: str) -> str:
     cfg = load()
     rcpt = parse_recipients(to)
-    send(rcpt, "Secrets: test e-mail", "This is a test message from Secrets.\nIf you can read it, your e-mail settings work.\n\nนี่คือข้อความทดสอบจาก Secrets\n",
-         f"<p>This is a test message from <b>Secrets</b>.<br>If you can read it, your e-mail settings work.</p><p>นี่คือข้อความทดสอบจาก Secrets</p>", cfg=cfg)
+    send(rcpt, "Zecrets: test e-mail", "This is a test message from Zecrets.\nIf you can read it, your e-mail settings work.\n\nนี่คือข้อความทดสอบจาก Zecrets\n",
+         f"<p>This is a test message from <b>Zecrets</b>.<br>If you can read it, your e-mail settings work.</p><p>นี่คือข้อความทดสอบจาก Zecrets</p>", cfg=cfg)
     return ", ".join(rcpt)
 
 
@@ -273,7 +273,7 @@ def build_meeting(mid: str, opts: dict | None = None) -> tuple[str, str, str, li
                              ("attach_transcript", "transcript.md", f"{mid}-transcript.md")):
         if opts.get(flag) and (d / fname).exists():
             att.append((out, (d / fname).read_bytes()))
-    return f"[Secrets] {title}", text, h, att
+    return f"[Zecrets] {title}", text, h, att
 
 
 def send_meeting(mid: str, to, opts: dict | None = None, auto: bool = False) -> list[str]:

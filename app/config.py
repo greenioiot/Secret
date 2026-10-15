@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = Path(os.environ.get("SECRET_DATA", ROOT / "data"))
+DATA = Path(os.environ.get("ZECRET_DATA", ROOT / "data"))
 MEETINGS = DATA / "meetings"
 PROJECT_AI = Path(os.environ.get("PROJECT_AI", "/home/dev/projectAI"))
 
@@ -19,7 +19,7 @@ WHISPER_CT2 = {
     "pathumma-large": ("pwl", PATHUMMA / "whisper-th-large-v3-ct2", "pathumma-whisper-th-large-v3", 4.0, "Pathumma Whisper Large v3"),
 }
 PATHUMMA_RNNT = PATHUMMA / "stt-fastconformer-rnnt/pathumma-stt-th-fastconformer-rnnt-large.nemo"  # NeMo FastConformer-RNNT (CC-BY-4.0): accuracy mode 'pathumma-rnnt'
-NEMO_PY = Path(os.environ.get("SECRET_NEMO_PY", "/mnt/genie/projectAI/export/venv-nemo/bin/python"))  # a venv with nemo_toolkit[asr] + torch (CPU)
+NEMO_PY = Path(os.environ.get("ZECRET_NEMO_PY", "/mnt/genie/projectAI/export/venv-nemo/bin/python"))  # a venv with nemo_toolkit[asr] + torch (CPU)
 WHISPER_TH = PROJECT_AI / "models/whisper-th/distill-whisper-th-medium"  # Thonburian, CTranslate2 (accurate pass)
 WHISPER_EN = ROOT / "models/whisper-en/large-v3-turbo-ct2"  # OpenAI Whisper large-v3-turbo, CTranslate2 (deepdml): English-only meetings, after the meeting
 WHISPER_EN_LIVE = ROOT / "models/whisper-en/small.en-ct2"  # Whisper small.en (Systran): live captions of English-only meetings (the big model pads every sentence to 30 s)
@@ -37,8 +37,8 @@ ENROLL_FILE = DATA / "enroll.json"                          # the currently open
 ENROLL_MIN_SPEECH_S = 8.0                                   # speech needed from a participant to make a usable voiceprint
 ENROLL_MAX_PENDING = 30
 
-PORT = int(os.environ.get("SECRET_PORT", "8444"))
-HOST = os.environ.get("SECRET_HOST", "0.0.0.0")  # all network interfaces (phones on the LAN join / enrol); 127.0.0.1 = this device only
+PORT = int(os.environ.get("ZECRET_PORT", "8444"))
+HOST = os.environ.get("ZECRET_HOST", "0.0.0.0")  # all network interfaces (phones on the LAN join / enrol); 127.0.0.1 = this device only
 LLM_PORT = 8591 + 10 * (PORT - 8444)  # summary model; bot uses +1. Live (8444) = 8591; a second instance (test copy) gets its own ports
 
 
@@ -125,16 +125,16 @@ DEFAULT_SETTINGS = {
     "use_materials": True,       # use a meeting's agenda + uploaded documents: speech-recognition prompt, term correction, summary context
     "apply_term_corrections": True,  # repair near-miss spellings of known terms in the transcript (originals are kept)
     "handsfree_enroll": False,   # EXPERIMENTAL: spoken, hands-free voice enrolment in the Voices tab (wake phrase + spoken guidance; needs Start in the browser)
-    "handsfree_wake": "Secrets", # the name in the wake phrase ("Hey Secrets, enroll my voice" / "เฮ้ ซีเคร็ท ลงทะเบียนเสียง")
+    "handsfree_wake": "Zecrets", # the name in the wake phrase ("Hey Zecrets, enroll my voice" / "เฮ้ ซีเคร็ท ลงทะเบียนเสียง")
     "handsfree_lang": "th",      # th | en: language of the spoken guidance
     "tts_engine": "piper",       # spoken guidance voice: piper = Piper th_TH tsync2 (fast) | pathumma-f5 = NECTEC Pathumma F5-TTS (natural, slow on the CPU)
     "enroll_text": "",           # the paragraph people read aloud when enrolling a voice; "" = config.ENROLL_TEXT
     "res_cpu": True,             # header bar: which gauges to show (CPU / RAM / NPU / GPU / disk); the details panel always has everything
     "res_ram": True,
     "res_npu": True,
-    "res_gpu": False,            # read-only GPU clock / temperature / who has it open (Secrets never uses the GPU)
+    "res_gpu": False,            # read-only GPU clock / temperature / who has it open (Zecrets never uses the GPU)
     "res_disk": True,
     "summary_use_passages": False,   # also quote relevant passages of the documents to the summary model (measured: no gain, small risk of mixing them into what was said)
 }
 JOIN_MAX = 30                    # guests per meeting
-JOIN_PER_IP = int(os.environ.get("SECRET_JOIN_PER_IP", "6"))                  # guest connections per device address
+JOIN_PER_IP = int(os.environ.get("ZECRET_JOIN_PER_IP", "6"))                  # guest connections per device address

@@ -1,4 +1,4 @@
-# Secrets: Python 3.12 (aarch64). Install: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# Zecrets: Python 3.12 (aarch64). Install: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 fastapi==0.142.2
 uvicorn==0.54.0
 websockets==17.2

@@ -19,7 +19,7 @@ from pathlib import Path
 
 import config
 
-log = logging.getLogger("secret.tts")
+log = logging.getLogger("zecret.tts")
 PY = config.PROJECT_AI / ".venv" / "bin" / "python"
 VOICE_TH = config.PROJECT_AI / "models/piper/th_TH/th_TH-tsync2-medium.onnx"
 CACHE = config.DATA / "tts-cache"

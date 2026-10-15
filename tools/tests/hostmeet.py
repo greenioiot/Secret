@@ -5,7 +5,7 @@ ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode 
 def login(user="boss", pw="adminpassword123"):
     c = httpx.Client(base_url=B, verify=False, timeout=120, headers={"Origin": B})
     assert c.post("/api/auth/login", json={"username": user, "password": pw}).status_code == 200
-    return c, "; ".join(f"{k}={v}" for k, v in c.cookies.items()), c.cookies.get("secret_csrf")
+    return c, "; ".join(f"{k}={v}" for k, v in c.cookies.items()), c.cookies.get("zecret_csrf")
 class Host:
     def __init__(self, title="phones"):
         self.title = title; self.msgs = []; self.mid = None

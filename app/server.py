@@ -1,4 +1,4 @@
-"""Secrets: on-device Thai meeting recorder. Browser mic -> WebSocket -> crash-safe disk -> (live captions) ->
+"""Zecrets: on-device Thai meeting recorder. Browser mic -> WebSocket -> crash-safe disk -> (live captions) ->
 worker process (accurate Thai ASR, summary). Everything stays on this machine."""
 from __future__ import annotations
 
@@ -47,9 +47,9 @@ import speakers
 import stats
 import store
 
-log = logging.getLogger("secret")
+log = logging.getLogger("zecret")
 HERE = Path(__file__).resolve().parent
-app = FastAPI(title="Secrets")
+app = FastAPI(title="Zecrets")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
 PARTIAL_POOL = ThreadPoolExecutor(1)  # interim captions never wait behind final captions / speaker labels
@@ -112,7 +112,7 @@ def live_engine(lang: str):
 
 
 PARTIAL_GAP = {"wctc": 2.0, "pathumma-rnnt": 3.0}  # seconds between interim texts (Pathumma runs on the CPU: about 1 s per call)
-SILENT_WARN_S = int(os.environ.get("SECRET_SILENT_S", "60"))  # recording: no sound for this long -> the recorder is warned (muted / unplugged microphone)
+SILENT_WARN_S = int(os.environ.get("ZECRET_SILENT_S", "60"))  # recording: no sound for this long -> the recorder is warned (muted / unplugged microphone)
 SOUND_DB = -50.0  # a 20 ms packet whose peak is above this counts as sound (room noise through an open microphone is around -45; a muted one -90 or less)
 
 
@@ -187,7 +187,7 @@ ADMIN_GET = ("/api/whois", "/api/email", "/api/users", "/api/enroll", "/guide", 
 ADMIN_WRITE = ("/api/queue/", "/api/whois", "/api/settings", "/api/vocab-suggestions", "/api/vocab", "/api/words", "/api/voices", "/api/enroll", "/api/email", "/api/bot/", "/api/kb", "/api/users", "/api/meetings/assign", "/api/tts")
 MEMBER_WRITE = ("/api/meetings/plan", "/api/table/delete", "/api/kb/search", "/api/me/", "/api/preflight")
 MEETING_RE = re.compile(r"^/api/meetings/([0-9]{8}-[0-9]{6}(?:-[0-9]+)?)(/.*)?$")
-BENCH_TOKEN = os.environ.get("SECRET_BENCH_TOKEN", "")  # tools/bench_capacity.py on its own throwaway instance only: header X-Secret-Token = admin
+BENCH_TOKEN = os.environ.get("ZECRET_BENCH_TOKEN", "")  # tools/bench_capacity.py on its own throwaway instance only: header X-Zecret-Token = admin
 
 
 def is_loopback(host: str | None) -> bool:
@@ -205,7 +205,7 @@ def same_origin(headers, url) -> bool:
 
 
 def user_of(cookies, headers) -> dict | None:
-    if BENCH_TOKEN and hmac.compare_digest(headers.get("x-secret-token") or "", BENCH_TOKEN):
+    if BENCH_TOKEN and hmac.compare_digest(headers.get("x-zecret-token") or "", BENCH_TOKEN):
         return {"user": "bench", "name": "bench", "role": "admin", "csrf": "", "bench": True}
     return auth.session(cookies.get(auth.COOKIE))
 
@@ -295,7 +295,7 @@ def login_page():
 
 @app.get("/sso")
 def sso_page():
-    return HTMLResponse("""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Company sign-in · Secrets</title>
+    return HTMLResponse("""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Company sign-in · Zecrets</title>
 <link rel=stylesheet href=/static/fonts.css><body style="font:16px/1.6 Inter,'Noto Sans Thai',system-ui;margin:0;display:grid;place-items:center;min-height:100vh;background:#f5f6f8;color:#1c2430">
 <div style="max-width:460px;padding:28px;background:#fff;border:1px solid #e3e6eb;border-radius:14px"><h2 style=margin-top:0>Company single sign-on (SSO)</h2>
 <p>Enterprise sign-in (SAML 2.0 / OpenID Connect, e.g. Microsoft Entra ID, Google Workspace, Okta) is <b>not connected yet</b>. This page is a placeholder for it.</p>
@@ -1597,12 +1597,12 @@ def api_stats_participants(date_from: str = "", date_to: str = ""):
 
 @app.get("/api/stats/participants.csv")
 def api_stats_participants_csv(date_from: str = "", date_to: str = ""):
-    return PlainTextResponse(stats.participants_csv(date_from, date_to), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="secrets-participants.csv"'})
+    return PlainTextResponse(stats.participants_csv(date_from, date_to), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="zecrets-participants.csv"'})
 
 
 @app.get("/api/stats/export.csv")
 def api_stats_export(date_from: str = "", date_to: str = ""):
-    return PlainTextResponse(stats.export_csv(date_from, date_to), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="secrets-statistics.csv"'})
+    return PlainTextResponse(stats.export_csv(date_from, date_to), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="zecrets-statistics.csv"'})
 
 
 @app.get("/api/meetings/{mid}/stats")
@@ -2174,7 +2174,7 @@ async def ws_handsfree(ws: WebSocket):
                 continue
             for _start, audio, _why in seg.feed(msg["bytes"]):
                 text, conf = await loop.run_in_executor(CAPTION_POOL, recognise, audio)
-                r = handsfree.parse(text, stage, cfg.get("handsfree_wake") or "Secrets", sens)
+                r = handsfree.parse(text, stage, cfg.get("handsfree_wake") or "Zecrets", sens)
                 await ws.send_json({"type": "heard", "text": text, "conf": round(float(conf), 2), "stage": stage, **r})
             if time.time() - last > 0.15:
                 last = time.time()
@@ -2503,7 +2503,7 @@ def _bot_wants_llm() -> bool:
 
 # ---------------------------------------------------------------- guests: join from the local network (OPTIONAL)
 # Off unless Settings -> "Allow participants to join" is on AND the host opens joining for a meeting that is being recorded.
-# A guest holds only the secret link of that meeting: it gives a read-only stream of live captions, nothing else.
+# A guest holds only the zecret link of that meeting: it gives a read-only stream of live captions, nothing else.
 GUESTS: dict[str, dict[int, dict]] = {}   # meeting id -> {guest id: {name, ip, q, since}}
 _gid = itertools.count(1)
 
@@ -2935,7 +2935,7 @@ async def ws_join(ws: WebSocket):
 
 
 # ---------------------------------------------------------------- participants enrol their own voice (OPTIONAL, host approves)
-# Off unless Settings -> "Let participants enrol their own voice". The host opens a time-limited secret link; a participant ticks
+# Off unless Settings -> "Let participants enrol their own voice". The host opens a time-limited zecret link; a participant ticks
 # consent, reads a text aloud, and the voiceprint waits as "pending" until the host approves it (so nobody can enrol under another's name).
 ENROLL_POOL = ThreadPoolExecutor(1)
 ENROLLING: dict[str, int] = {}
@@ -3268,7 +3268,7 @@ def main():
     cert, key = HERE / "certs/cert.pem", HERE / "certs/key.pem"
     if cert.exists() and key.exists():
         kw = {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
-    print(f"Secrets on https://{config.HOST}:{config.PORT}" + ("" if auth.has_users() else f"  first-admin setup code: {token()}"), flush=True)
+    print(f"Zecrets on https://{config.HOST}:{config.PORT}" + ("" if auth.has_users() else f"  first-admin setup code: {token()}"), flush=True)
     try:
         import uvloop  # noqa: F401 - its own TLS code: Python 3.12's asyncio SSL once spun the event loop at 100 % and wrote 5.7 GB of "Exception in callback None()" to the log
 

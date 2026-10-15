@@ -11,14 +11,14 @@ args = ap.parse_args()
 steps = [int(x) for x in args.steps.split(",")]
 raw = np.frombuffer(wave.open(args.wav).readframes(10**9), np.int16).tobytes()
 frames = [raw[i:i + 640] for i in range(0, len(raw), 640)]
-tmp = tempfile.mkdtemp(prefix="secrets-bench-"); PORT = 8446; TOK = "benchtoken123"
+tmp = tempfile.mkdtemp(prefix="zecrets-bench-"); PORT = 8446; TOK = "benchtoken123"
 os.makedirs(tmp + "/meetings"); open(tmp + "/access.token", "w").write(TOK)
 json.dump({"allow_join": True, "max_guests": 500, "reserve_ram_gb": 0.5, "cpu_limit_pct": 100}, open(tmp + "/settings.json", "w"))
-env = {**os.environ, "SECRET_DATA": tmp, "SECRET_PORT": str(PORT), "SECRET_JOIN_PER_IP": "100000", "SECRET_BENCH_TOKEN": TOK}  # all simulated guests share one address
+env = {**os.environ, "ZECRET_DATA": tmp, "ZECRET_PORT": str(PORT), "ZECRET_JOIN_PER_IP": "100000", "ZECRET_BENCH_TOKEN": TOK}  # all simulated guests share one address
 srv = subprocess.Popen([sys.executable, os.path.join(ROOT, "app/server.py")], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=ROOT)
 ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
 def http(method, path, body=None):
-    r = urllib.request.Request(f"https://127.0.0.1:{PORT}{path}", method=method, data=json.dumps(body).encode() if body is not None else None, headers={"X-Secret-Token": TOK, "Content-Type": "application/json"})
+    r = urllib.request.Request(f"https://127.0.0.1:{PORT}{path}", method=method, data=json.dumps(body).encode() if body is not None else None, headers={"X-Zecret-Token": TOK, "Content-Type": "application/json"})
     return json.loads(urllib.request.urlopen(r, context=ctx, timeout=30).read())
 def rss_mb(pid): return next(int(l.split()[1]) for l in open(f"/proc/{pid}/status") if l.startswith("VmRSS:")) / 1024
 def cpu_s(pid):
@@ -28,7 +28,7 @@ async def main():
         try: http("GET", "/api/status"); break
         except Exception: await asyncio.sleep(1)
     cores = os.cpu_count() or 8; results = []
-    host = await websockets.connect(f"wss://127.0.0.1:{PORT}/ws/record?mode=live&title=bench", ssl=ctx, additional_headers={"X-Secret-Token": TOK}, max_size=None)
+    host = await websockets.connect(f"wss://127.0.0.1:{PORT}/ws/record?mode=live&title=bench", ssl=ctx, additional_headers={"X-Zecret-Token": TOK}, max_size=None)
     msgs = []
     async def reader():
         async for m in host: msgs.append(json.loads(m))

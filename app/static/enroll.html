@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Enroll your voice · Secrets</title>
+<title>Enroll your voice · Zecrets</title>
 <link rel="stylesheet" href="/static/fonts.css">
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--bad:#dc2626;--rec:#e11d48}
@@ -38,10 +38,10 @@ button.live{background:var(--ink);color:var(--bg)}
 .hide{display:none!important}
 </style>
 <link rel="stylesheet" href="/static/theme.css">
-<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<script>try { const t = localStorage.getItem("zecrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
-<header>Secrets · Voice enrolment</header>
+<header>Zecrets · Voice enrolment</header>
 <main>
   <div id="guide" class="card gcard">
     <div class="gh"><div class="av" id="gav">?</div><b id="gname">…</b><span style="flex:1"></span><span class="gl"><button data-l="th">ไทย</button> <button data-l="en">EN</button></span></div>
@@ -53,10 +53,10 @@ button.live{background:var(--ink);color:var(--bg)}
   </div>
   <div id="form" class="card">
     <h1>Enroll your voice · ลงทะเบียนเสียงของคุณ</h1>
-    <p class="mute" style="margin-top:0">So Secrets can put your name on what you say in meetings. It takes about 30 seconds.</p>
+    <p class="mute" style="margin-top:0">So Zecrets can put your name on what you say in meetings. It takes about 30 seconds.</p>
     <label for="name" class="mute" style="font-size:14px">Your name · ชื่อของคุณ</label>
     <input type="text" id="name" maxlength="40" autocomplete="name" placeholder="e.g. สมชาย">
-    <label class="c"><input type="checkbox" id="consent"><span>I agree that Secrets stores a <b>voiceprint</b> (a numeric description of my voice) on this device so it can recognise me in meeting recordings. The host reviews it before it is used. My recording is <b>not</b> saved, only the voiceprint, and I can ask the host to delete it at any time.<br>
+    <label class="c"><input type="checkbox" id="consent"><span>I agree that Zecrets stores a <b>voiceprint</b> (a numeric description of my voice) on this device so it can recognise me in meeting recordings. The host reviews it before it is used. My recording is <b>not</b> saved, only the voiceprint, and I can ask the host to delete it at any time.<br>
       <span class="mute">ฉันยินยอมให้เก็บ “ลายเสียง” (ค่าตัวเลขที่อธิบายเสียงของฉัน) ไว้ในเครื่องนี้เพื่อใช้ระบุตัวฉันในการประชุม โดยเจ้าของห้องประชุมจะตรวจสอบก่อนใช้งาน ไม่มีการเก็บไฟล์เสียงของฉัน และฉันขอให้ลบได้ทุกเมื่อ</span></span></label>
     <div class="mute">When you press Start, read this aloud in your normal voice, close to the phone, in a quiet place:</div>
     <div class="read" id="text"></div>
@@ -70,7 +70,7 @@ button.live{background:var(--ink);color:var(--bg)}
 const $ = s => document.querySelector(s);
 const token = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
 let sock, ctx, stream, node, running = false, finished = false;
-try { $("#name").value = localStorage.getItem("secrets.guestName") || ""; } catch {}
+try { $("#name").value = localStorage.getItem("zecrets.guestName") || ""; } catch {}
 /* ---------- the guide (explains, coaches, tells the address, answers enrolment questions only) ---------- */
 let G = null, glang = (navigator.language || "").toLowerCase().startsWith("th") ? "th" : "en", gstage = 1, lastCoach = 0, quietN = 0, userLang = false;
 const GT = {
@@ -127,7 +127,7 @@ async function start() {
   catch (e) { gsay("mic_err"); gstep(3, 2); return showErr("Microphone error: " + e.message + ". Allow the microphone for this page and try again."); }
   ctx = new AudioContext(); await ctx.resume(); await ctx.audioWorklet.addModule("/static/pcm-worklet.js");
   node = new AudioWorkletNode(ctx, "pcm-downsampler"); ctx.createMediaStreamSource(stream).connect(node);
-  try { localStorage.setItem("secrets.guestName", name); } catch {}
+  try { localStorage.setItem("zecrets.guestName", name); } catch {}
   finished = false; sock = new WebSocket(`wss://${location.host}/ws/enroll-guest?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}&consent=1`); sock.binaryType = "arraybuffer";
   node.port.onmessage = e => { if (sock.readyState === 1 && running) sock.send(e.data); };
   sock.onopen = () => { running = true; $("#go").textContent = "Stop and send · หยุดและส่ง"; $("#go").classList.add("live"); $("#cancel").classList.remove("hide"); $("#status").textContent = "Recording… read the text aloud."; gstep(4, 3); gsay("rec"); };

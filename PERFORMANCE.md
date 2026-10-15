@@ -1,4 +1,4 @@
-# Secrets: what each step uses, and how fast and accurate it is (2026-10-11)
+# Zecrets: what each step uses, and how fast and accurate it is (2026-10-11)
 
 All numbers were measured on this box (8-core Arm CPU with 4 fast + 4 slow cores, 34 GB RAM, a Hexagon NPU with 2 cores) unless marked otherwise.
 

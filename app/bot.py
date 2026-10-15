@@ -179,7 +179,7 @@ class LlmHandle:
         return out
 
     def _reap_stale(self):
-        """A previous Secrets server that was killed hard may have left ITS bot model on this port: stop that one (only this port, only exact matches)."""
+        """A previous Zecrets server that was killed hard may have left ITS bot model on this port: stop that one (only this port, only exact matches)."""
         for pid in self.stale_pids():
             try:
                 os.kill(pid, signal.SIGTERM)

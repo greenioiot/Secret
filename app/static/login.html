@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in · Secrets</title>
+<title>Sign in · Zecrets</title>
 <link rel="stylesheet" href="/static/fonts.css">
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#dfe3e9;--acc:#2f6fed;--acc2:#7c3aed;--bad:#dc2626;--warn:#b45309;--field:#f8f9fb}
@@ -44,11 +44,11 @@ input:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(-
 @media (max-width:860px){body{grid-template-columns:1fr}.brand{padding:22px 22px 20px}.brand .lead{font-size:17px;margin:14px 0 0}.brand ul,.brand small{display:none}.panel{align-items:start;padding-top:28px}}
 </style>
 <link rel="stylesheet" href="/static/theme.css">
-<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<script>try { const t = localStorage.getItem("zecrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
 <aside class="brand">
-  <div class="logo"><div class="mark">S</div><h1>Secrets</h1></div>
+  <div class="logo"><div class="mark">S</div><h1>Zecrets</h1></div>
   <div>
     <p class="lead">Thai meeting recorder that keeps every word on this device. · บันทึกและสรุปการประชุมภาษาไทย ข้อมูลอยู่ในเครื่องนี้เท่านั้น</p>
     <ul><li>Live Thai captions and accurate transcripts</li><li>Speaker names, participation report and AI notes</li><li>Nothing is uploaded: audio, text and voices stay here</li></ul>
@@ -60,7 +60,7 @@ input:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(-
   <div class="box">
     <form id="login" novalidate>
       <h2 id="ttl">Sign in</h2>
-      <p class="sub" id="sub">Use your Secrets account · เข้าสู่ระบบด้วยบัญชีของคุณ</p>
+      <p class="sub" id="sub">Use your Zecrets account · เข้าสู่ระบบด้วยบัญชีของคุณ</p>
       <div id="setupInfo" class="setup hide"><b>First start: create the administrator account.</b><br>No accounts exist yet. Enter the <b>setup code</b> to prove you own this box: it is in <code>data/access.token</code> and is printed in the server log at start (it was the old access code). Then choose a user name and a password of at least <span id="minpw">12</span> characters.</div>
       <div id="codeRow" class="hide"><label for="code">Setup code</label><input id="code" autocomplete="off" spellcheck="false"></div>
       <label for="username">User name · ชื่อผู้ใช้</label><input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
@@ -80,20 +80,20 @@ input:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(-
 const $ = s => document.querySelector(s);
 let setup = false;
 const root = document.documentElement;
-const savedTheme = localStorage.getItem("secrets_theme"); if (savedTheme) root.dataset.theme = savedTheme;
-$("#theme").onclick = () => { const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; root.dataset.theme = dark ? "light" : "dark"; localStorage.setItem("secrets_theme", root.dataset.theme); };
+const savedTheme = localStorage.getItem("zecrets_theme"); if (savedTheme) root.dataset.theme = savedTheme;
+$("#theme").onclick = () => { const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; root.dataset.theme = dark ? "light" : "dark"; localStorage.setItem("zecrets_theme", root.dataset.theme); };
 $("#eye").onclick = () => { const p = $("#password"), show = p.type === "password"; p.type = show ? "text" : "password"; if (setup) $("#password2").type = p.type; $("#eye").textContent = show ? "Hide" : "Show"; $("#eye").setAttribute("aria-label", show ? "Hide password" : "Show password"); p.focus(); };
 const caps = e => { if (e.getModifierState) $("#caps").classList.toggle("on", e.getModifierState("CapsLock")); };
 ["#password", "#password2"].forEach(s => { $(s).addEventListener("keyup", caps); $(s).addEventListener("keydown", caps); $(s).addEventListener("blur", () => $("#caps").classList.remove("on")); });
 function err(m) { $("#err").textContent = m; $("#err").classList.toggle("on", !!m); }
 async function init() {
-  let s; try { s = await (await fetch("/api/auth/state")).json(); } catch { err("Cannot reach the Secrets server."); return; }
+  let s; try { s = await (await fetch("/api/auth/state")).json(); } catch { err("Cannot reach the Zecrets server."); return; }
   if (s.signed_in) { location.replace("/"); return; }
   $("#minpw").textContent = s.min_password;
   if (s.remote_needs_https) err("Sign-in from another device needs HTTPS: open this page with https:// instead of http://.");
   setup = s.setup_needed;
   if (setup) {
-    $("#ttl").textContent = "Set up Secrets"; $("#sub").textContent = "Create the first administrator · สร้างบัญชีผู้ดูแลระบบ";
+    $("#ttl").textContent = "Set up Zecrets"; $("#sub").textContent = "Create the first administrator · สร้างบัญชีผู้ดูแลระบบ";
     ["#setupInfo", "#codeRow", "#nameRow", "#pw2Row"].forEach(x => $(x).classList.remove("hide")); $("#ssoBox").classList.add("hide");
     $("#password").autocomplete = "new-password"; $("#goTxt").textContent = "Create administrator"; $("#foot").textContent = "There are no default accounts or passwords.";
     $("#code").focus();

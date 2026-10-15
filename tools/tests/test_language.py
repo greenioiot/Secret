@@ -13,7 +13,7 @@ def pcm(path):
     w = wave.open(path); assert w.getframerate() == 16000; return w.readframes(w.getnframes())
 c = httpx.Client(base_url=B, verify=False, timeout=120, headers={"Origin": B})
 assert c.post("/api/auth/login", json={"username": "boss", "password": "adminpassword123"}).status_code == 200
-cookie = "; ".join(f"{k}={v}" for k, v in c.cookies.items()); H = {"X-CSRF-Token": c.cookies.get("secret_csrf")}
+cookie = "; ".join(f"{k}={v}" for k, v in c.cookies.items()); H = {"X-CSRF-Token": c.cookies.get("zecret_csrf")}
 put = lambda d: c.put("/api/settings", headers=H, json=d).json()
 s = put({"batch_night": False, "auto_process": True, "auto_summary": True, "allow_join": False, "accuracy": "pathumma-rnnt", "language": "th", "identify_speakers": False, "live_accurate": False})
 check("settings: language default th", s.get("language") == "th", s.get("language"))

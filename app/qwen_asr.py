@@ -15,7 +15,7 @@ import numpy as np
 
 import config
 
-MODEL = os.environ.get("SECRET_QWEN_ASR", "typhoon-ai/typhoon-asr-qwen-1.7b-ctx")
+MODEL = os.environ.get("ZECRET_QWEN_ASR", "typhoon-ai/typhoon-asr-qwen-1.7b-ctx")
 PY = config.ROOT / ".venv-qwen/bin/python"
 
 

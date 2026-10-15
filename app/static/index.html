@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Secrets · Thai Meeting Recorder</title>
+<title>Zecrets · Thai Meeting Recorder</title>
 <link rel="stylesheet" href="/static/fonts.css">
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--acc:#2f6fed;--acc-ink:#fff;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--rec:#e11d48}
@@ -184,11 +184,11 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
 .alt-row .alt:hover { border-color: var(--acc); }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
-<script>try { const t = localStorage.getItem("secrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<script>try { const t = localStorage.getItem("zecrets_theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
 <header>
-  <h1>🎙 Secrets</h1>
+  <h1>🎙 Zecrets</h1>
   <nav><button data-tab="rec" class="on">Record · บันทึก</button><button data-tab="list">Meetings · การประชุม</button><button data-tab="voices">Voices · เสียง</button><button data-tab="vocab">Vocab · คำศัพท์</button><button data-tab="stats">Stats · สถิติ</button><button data-tab="bot">Bot · บอท</button><button data-tab="set">Settings · ตั้งค่า</button></nav>
   <div class="meters" id="meters" title="Click for details">
     <div class="gauge" id="g_cpu"><span>CPU</span><div class="gb"><i></i></div><span class="gv">–</span></div>
@@ -330,7 +330,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
   <div class="tabs" id="vSub"><button class="btn pri" data-vs="lib">Voice library · คลังเสียง</button><button class="btn adm" data-vs="enrol">Enrol a voice · ลงทะเบียนเสียง</button><button class="btn adm" data-vs="who">Who is this? · ใครพูด</button></div>
   <div id="vsLib">
     <div class="card"><h2>Voice library · คลังเสียง</h2>
-      <p class="mute">Voiceprints let Secrets put a name on a participant automatically. They are biometric data: stored only on this device, collected with the person's consent, deleted on request. For playback, up to 40 seconds of each person's own speech is kept. Only administrators can change the library or play samples.</p>
+      <p class="mute">Voiceprints let Zecrets put a name on a participant automatically. They are biometric data: stored only on this device, collected with the person's consent, deleted on request. For playback, up to 40 seconds of each person's own speech is kept. Only administrators can change the library or play samples.</p>
       <div class="row" style="gap:8px"><input type="text" id="voiceQ" class="rok" placeholder="Search names and notes…" style="flex:1;min-width:200px;margin:0"><span class="mute" id="voiceCount"></span></div>
       <div id="voiceList" style="margin-top:10px"></div></div>
   </div>
@@ -456,7 +456,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
     <div id="m_msg" style="margin-top:8px"></div>
   </div>
   <div data-sg="sys" class="card adm"><h2>Capacity &amp; limits · ขีดจำกัดการใช้งาน</h2>
-    <p class="mute">Secrets keeps the recording and live captions smooth: people are refused when free RAM or CPU would drop below these limits. The real limit can be lower than the number you set.</p>
+    <p class="mute">Zecrets keeps the recording and live captions smooth: people are refused when free RAM or CPU would drop below these limits. The real limit can be lower than the number you set.</p>
     <label>Most people who may join one meeting</label><input type="text" id="s_max_guests" inputmode="numeric">
     <label>RAM always kept free (GB)</label><input type="text" id="s_reserve_ram_gb" inputmode="decimal">
     <label>Do not let the CPU go above (%)</label><input type="text" id="s_cpu_limit_pct" inputmode="numeric">
@@ -467,7 +467,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
     <div class="kv"><span>Allow participants to join a meeting from their own device</span><input type="checkbox" id="s_allow_join">
     <span>Add people who join to the meeting's participants</span><input type="checkbox" id="s_join_add_attendee"></div>
     <div class="kv"><span>Participants may send their own phone's microphone (they tap 🎤 on the join page; their words come out clean even when people talk at once)</span><input type="checkbox" id="s_guest_mic"></div>
-    <p class="mute">Off by default. When on, you choose per meeting (Record tab) whether to open joining. Guests follow the live captions through a secret link that works while the meeting is being recorded: they cannot open recordings, other meetings or settings. If you allow it, a participant can also tap 🎤 to send their own phone's microphone: it is kept with the meeting as their own track (the “mics” folder of the meeting) and used for their lines in the transcript. Only share the link with people in the room. Names are typed by the guests and are not verified. Phones show a certificate warning once (this box uses a self-signed certificate): tap “Advanced” and continue.</p>
+    <p class="mute">Off by default. When on, you choose per meeting (Record tab) whether to open joining. Guests follow the live captions through a zecret link that works while the meeting is being recorded: they cannot open recordings, other meetings or settings. If you allow it, a participant can also tap 🎤 to send their own phone's microphone: it is kept with the meeting as their own track (the “mics” folder of the meeting) and used for their lines in the transcript. Only share the link with people in the room. Names are typed by the guests and are not verified. Phones show a certificate warning once (this box uses a self-signed certificate): tap “Advanced” and continue.</p>
   </div>
   <div data-sg="asr" class="card adm"><h2>Speech recognition on the NPU · ถอดเสียงด้วย NPU</h2>
     <div class="kv"><span>Run the Typhoon Thai recogniser on the Hexagon NPU</span><input type="checkbox" id="s_asr_npu">
@@ -492,7 +492,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
     <label>Names and jargon (one per line or comma-separated): used to repair misspelt names/terms in the transcript and to spell them correctly in the summary</label><textarea id="s_glossary"></textarea>
   </div>
   <div data-sg="words" class="card adm"><h2>Word collection · คลังคำที่แก้</h2>
-    <p class="mute">When the recogniser writes a wrong word, save it here with the right word. Every live caption (including what participants see) and every transcript is fixed from then on. Tip: correct a word in any transcript line and Secrets offers to remember it.</p>
+    <p class="mute">When the recogniser writes a wrong word, save it here with the right word. Every live caption (including what participants see) and every transcript is fixed from then on. Tip: correct a word in any transcript line and Zecrets offers to remember it.</p>
     <div id="wcList"></div>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><input type="text" id="wc_wrong" placeholder="Wrong · คำที่ผิด" style="flex:1;min-width:140px"><span>→</span><input type="text" id="wc_right" placeholder="Right · คำที่ถูก" style="flex:1;min-width:140px"><button class="btn" id="wc_add">Add</button></div>
     <div class="mute" id="wcMsg" style="margin-top:6px"></div>
@@ -511,7 +511,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
   <div data-sg="sys" class="card adm"><h2>Header bar · แถบสถานะ</h2>
     <div class="kv"><span>CPU</span><input type="checkbox" id="s_res_cpu"><span>Memory (RAM)</span><input type="checkbox" id="s_res_ram"><span>NPU (estimate)</span><input type="checkbox" id="s_res_npu">
       <span>GPU (read only: clock, temperature, who has it open)</span><input type="checkbox" id="s_res_gpu"><span>Disk storage</span><input type="checkbox" id="s_res_disk"></div>
-    <p class="mute">Which gauges appear at the top of every page. Click the bar for all details. Secrets never uses the GPU.</p>
+    <p class="mute">Which gauges appear at the top of every page. Click the bar for all details. Zecrets never uses the GPU.</p>
   </div>
   <div data-sg="asr" class="card adm"><h2>Microphone (browser)</h2>
     <div class="kv"><span>Echo cancellation</span><input type="checkbox" id="s_mic_echo_cancel"><span>Noise suppression</span><input type="checkbox" id="s_mic_noise_suppress"><span>Auto gain</span><input type="checkbox" id="s_mic_auto_gain"></div>
@@ -553,7 +553,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
 <script>
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); kids.flat().forEach(k => e.append(k)); return e; };
-const csrfToken = () => decodeURIComponent((document.cookie.match(/(?:^|; )secret_csrf=([^;]*)/) || [])[1] || "");
+const csrfToken = () => decodeURIComponent((document.cookie.match(/(?:^|; )zecret_csrf=([^;]*)/) || [])[1] || "");
 const api = async (path, opt = {}) => {
   const r = await fetch("/api" + path, { ...opt, headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() }, body: opt.body && JSON.stringify(opt.body) });
   if (r.status === 401) { location.href = "/login"; throw new Error("signed out"); }
@@ -569,7 +569,7 @@ const chip = (text, color) => el("span", { className: "chip-spk", textContent: t
 let settings = {}, tab = "rec", openId = null;
 
 /* ---------- microphone choice (device ids belong to this browser, so it is kept in localStorage) ---------- */
-const micConstraint = () => { const id = localStorage.getItem("secrets.mic") || ""; return id ? { deviceId: { exact: id } } : {}; };
+const micConstraint = () => { const id = localStorage.getItem("zecrets.mic") || ""; return id ? { deviceId: { exact: id } } : {}; };
 async function getMic(audio, msgEl) {   // the chosen microphone, or the default one when it is not connected any more
   try { return await navigator.mediaDevices.getUserMedia({ audio: { ...micConstraint(), ...audio } }); }
   catch (e) { if (!micConstraint().deviceId || !["OverconstrainedError", "NotFoundError"].includes(e.name)) throw e;
@@ -584,7 +584,7 @@ async function allowMic() {   // the browser shows device ids and names only aft
 async function listMics() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   let devs = []; try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput"); } catch { return; }
-  const sel = $("#micSel"), cur = localStorage.getItem("secrets.mic") || "";
+  const sel = $("#micSel"), cur = localStorage.getItem("zecrets.mic") || "";
   const known = devs.filter(d => d.deviceId && d.deviceId !== "default");
   sel.replaceChildren(el("option", { value: "", textContent: "Browser default microphone" }), ...known.map((d, i) => el("option", { value: d.deviceId, textContent: d.label || `Microphone ${i + 1} (name shown after the first recording)`, selected: d.deviceId === cur })));
   if (!known.length && devs.length) sel.append(el("option", { value: "", disabled: true, textContent: "(press ↻ and allow the microphone to see the list)" }));  // Chrome before permission: inputs without id or name
@@ -634,14 +634,14 @@ function renderSys(s) {
     el("h3", { textContent: "Memory" }), row(`${m.used_gb.toFixed(1)} of ${m.total_gb.toFixed(1)} GB used`, `${m.avail_gb.toFixed(1)} GB free`), bar(m.pct, m.pct > 92 ? "var(--bad)" : m.pct > 80 ? "var(--warn)" : ""), row("Swap in use", m.swap_used_gb.toFixed(1) + " GB"),
     ...(s.procs || []).slice(0, 5).map(x => row(x.name, x.rss_mb + " MB")),
     el("h3", { textContent: "NPU (estimate)" }), row(s.npu.state === "idle" ? "Nobody is using the NPU" : "In use by " + s.npu.holders.map(h => h.name).join(", "), s.npu.state === "active" ? `driver ${s.npu.driver_pct}%` : s.npu.state),
-    el("div", { className: "mute", style: "font-size:12px", textContent: s.npu.note }), el("div", { className: "mute", style: "font-size:12px", textContent: "Secrets itself runs on the CPU and leaves the NPU to other apps." }),
+    el("div", { className: "mute", style: "font-size:12px", textContent: s.npu.note }), el("div", { className: "mute", style: "font-size:12px", textContent: "Zecrets itself runs on the CPU and leaves the NPU to other apps." }),
     ...(s.gpu && s.gpu.present ? [el("h3", { textContent: "GPU (read only)" }), row(s.gpu.holders.length ? "Open in " + s.gpu.holders.map(h => h.name).join(", ") : "No process of yours has the GPU open", `${s.gpu.freq_mhz} / ${s.gpu.max_mhz} MHz` + (s.gpu.temp_c ? ` · ${s.gpu.temp_c} °C` : "")),
       el("div", { className: "mute", style: "font-size:12px", textContent: s.gpu.note })] : []),
     ...(s.disk && s.disk.total_gb ? [el("h3", { textContent: "Disk storage" }), row(`${s.disk.used_gb} of ${s.disk.total_gb} GB used`, `${s.disk.free_gb} GB free`), bar(s.disk.pct, s.disk.pct > 95 ? "var(--bad)" : s.disk.pct > 85 ? "var(--warn)" : ""),
       row("Meetings (audio, transcripts, summaries)", s.disk.meetings_gb != null ? s.disk.meetings_gb + " GB" : "…"), row("Voice library", s.disk.voices_mb != null ? s.disk.voices_mb + " MB" : "…"),
       el("div", { className: "mute", style: "font-size:12px", textContent: "Recording refuses to start below 1.5 GB free and stops cleanly below 0.5 GB." })] : []),
     el("h3", { textContent: "Capacity for this meeting" }), el("div", { textContent: c.text }), ...c.warnings.map(w => el("div", { style: "color:var(--warn);margin-top:4px", textContent: "⚠ " + w })),
-    el("div", { className: "mute", style: "font-size:12px;margin-top:6px", textContent: `Secrets now: web ${s.secrets.web_mb || 0} MB · worker ${s.secrets.worker_mb || 0} MB · summary model ${s.secrets.llm_mb || 0} MB · bot model ${s.secrets.bot_llm_mb || 0} MB` }));
+    el("div", { className: "mute", style: "font-size:12px;margin-top:6px", textContent: `Zecrets now: web ${s.zecrets.web_mb || 0} MB · worker ${s.zecrets.worker_mb || 0} MB · summary model ${s.zecrets.llm_mb || 0} MB · bot model ${s.zecrets.bot_llm_mb || 0} MB` }));
 }
 $("#meters").onclick = e => { e.stopPropagation(); sysOn = !sysOn; $("#sysPanel").classList.toggle("hide", !sysOn); if (sysOn && lastSys) renderSys(lastSys); };
 document.addEventListener("click", e => { if (sysOn && !$("#sysPanel").contains(e.target)) { sysOn = false; $("#sysPanel").classList.add("hide"); } });
@@ -1130,7 +1130,7 @@ function badge(st) {
 const STATUS_ORDER = ["planned", "recording", "interrupted", "recorded", "transcribing", "analysing", "transcribed", "summarizing", "done", "error"];
 const HAS = [["summary", "Summary"], ["report", "Report"], ["speakers", "Participants"], ["agenda", "Agenda"], ["materials", "Documents"], ["bot", "Bot"], ["email", "Emailed"]];
 let T = { q: "", fields: "all", status: [], date_from: "", date_to: "", person: "", min_min: "", max_min: "", has: [], sort: "created", dir: "desc", page: 1, size: 25 }, tData = null, tSel = new Map(), tDeb = null;
-try { const s = JSON.parse(localStorage.getItem("secrets.table") || "{}"); for (const k of ["fields", "sort", "dir", "size"]) if (s[k]) T[k] = s[k]; } catch {}
+try { const s = JSON.parse(localStorage.getItem("zecrets.table") || "{}"); for (const k of ["fields", "sort", "dir", "size"]) if (s[k]) T[k] = s[k]; } catch {}
 const fdt = s => (s || "").replace("T", " ").slice(0, 16);
 function tQuery(withPaging = true) {
   const p = new URLSearchParams(); const add = (k, v) => { if (v !== "" && v != null && !(Array.isArray(v) && !v.length)) p.set(k, Array.isArray(v) ? v.join(",") : v); };
@@ -1285,7 +1285,7 @@ async function loadList(silent) {
   if (tData.rows.some(r => ["transcribing", "summarizing", "analysing"].includes(r.status))) {
     try { (await api("/meetings")).forEach(m => { tLive[m.id] = m; }); } catch {}
   }
-  T.page = tData.page; try { localStorage.setItem("secrets.table", JSON.stringify({ fields: T.fields, sort: T.sort, dir: T.dir, size: T.size })); } catch {}
+  T.page = tData.page; try { localStorage.setItem("zecrets.table", JSON.stringify({ fields: T.fields, sort: T.sort, dir: T.dir, size: T.size })); } catch {}
   renderStatusChips(); renderTable(); renderPager(); renderBulk();
 }
 function renderStatusChips() {
@@ -1564,7 +1564,7 @@ function speakerMenu(ev, d, idx, sid) {
 
 async function renderSpeakers(body, d, busy) {
   if (!d.speakers.length) {
-    body.append(el("p", { className: "mute", textContent: "No participant information for this meeting yet. Secrets can analyse the recording and label who said what, without transcribing again (your text corrections are kept)." }),
+    body.append(el("p", { className: "mute", textContent: "No participant information for this meeting yet. Zecrets can analyse the recording and label who said what, without transcribing again (your text corrections are kept)." }),
       el("button", { className: "btn pri", textContent: "Identify participants now", disabled: busy || !d.transcript || !d.has_audio, onclick: () => again("speakers") }));
     return;
   }
@@ -1776,7 +1776,7 @@ async function ttsInfo() {   // the guidance voice: installed? how many sentence
 }
 async function ttsPrewarm() {   // the fixed guidance sentences (and those with the wake name) are made ahead in the Pathumma voice
   if (settings.tts_engine !== "pathumma-f5") { ttsInfo(); return; }
-  const T = HF_TEXT[(settings.handsfree_lang || "th") === "en" ? "en" : "th"], wake = settings.handsfree_wake || "Secrets";
+  const T = HF_TEXT[(settings.handsfree_lang || "th") === "en" ? "en" : "th"], wake = settings.handsfree_wake || "Zecrets";
   const texts = Object.entries(T).flatMap(([k, v]) => typeof v === "string" ? [v] : ["start", "back"].includes(k) ? [v(wake)] : []);
   try { await api("/tts/prewarm", { method: "POST", body: { texts } }); } catch {}
   ttsInfo();
@@ -2036,7 +2036,7 @@ async function loadMe() {
 const THEME_TXT = { auto: "Device · ตามเครื่อง", dark: "Dark · มืด", light: "White · ขาว", gray: "Gray · เทา (admin)" };
 function applyTheme(t) {   // the account's choice; localStorage lets the next page load paint in it before /api/me answers
   const r = document.documentElement;
-  if (t === "auto") { delete r.dataset.theme; localStorage.removeItem("secrets_theme"); } else { r.dataset.theme = t; localStorage.setItem("secrets_theme", t); }
+  if (t === "auto") { delete r.dataset.theme; localStorage.removeItem("zecrets_theme"); } else { r.dataset.theme = t; localStorage.setItem("zecrets_theme", t); }
 }
 function renderThemes() {
   $("#themeSeg").replaceChildren(...(me.themes || ["auto", "light", "dark"]).map(t => el("button", { type: "button", className: t === (me.theme || "auto") ? "on" : "", textContent: THEME_TXT[t] || t,
@@ -2242,7 +2242,7 @@ function whoCard(u) {
 document.querySelectorAll("#setSub button").forEach(b => b.onclick = () => setSub(b.dataset.sg));
 function setSub(k) {
   if (!isAdmin()) k = "acc";
-  k = k || localStorage.getItem("secrets.setSub") || "asr"; localStorage.setItem("secrets.setSub", k);
+  k = k || localStorage.getItem("zecrets.setSub") || "asr"; localStorage.setItem("zecrets.setSub", k);
   document.querySelectorAll("#setSub button").forEach(b => b.classList.toggle("pri", b.dataset.sg === k));
   document.querySelectorAll("#tab-set [data-sg].card").forEach(c => c.style.display = c.dataset.sg === k ? "" : "none");
   $("#saveSetRow").style.display = k === "acc" ? "none" : "";
@@ -2401,7 +2401,7 @@ function hfInit() {
   const card = $("#hfCard"); if (!card) return;
   renderEnrolText();
   card.classList.toggle("hide", !settings.handsfree_enroll || !isAdmin());
-  $("#hfWake").textContent = `“Hey ${settings.handsfree_wake || "Secrets"}, enroll my voice” · “เฮ้ ${settings.handsfree_wake || "Secrets"} ลงทะเบียนเสียง”`;
+  $("#hfWake").textContent = `“Hey ${settings.handsfree_wake || "Zecrets"}, enroll my voice” · “เฮ้ ${settings.handsfree_wake || "Zecrets"} ลงทะเบียนเสียง”`;
 }
 function hfT() { return HF_TEXT[(settings.handsfree_lang || "th") === "en" ? "en" : "th"]; }
 function hfShow(step, text, kind) {
@@ -2439,7 +2439,7 @@ async function hfOn(m) {   // one recognised utterance (or an on-screen button) 
   if (!HF || HF.busy) return;
   if (m.text) hfShow(HF.step, m.text + (m.intent === "unknown" ? "  (not understood)" : ""), "you");
   if (m.intent === "cancel") return hfCancel();
-  const T = hfT(), wake = settings.handsfree_wake || "Secrets";
+  const T = hfT(), wake = settings.handsfree_wake || "Zecrets";
   HF.busy = true;
   try {
     if (HF.stage === "wake" || HF.stage === "command") {
@@ -2523,11 +2523,11 @@ $("#hfBtn").onclick = async () => {
     if (m.type === "heard") hfOn(m);
     if (m.type === "error") hfStop(m.message); };
   ws.onclose = ev => { if (HF && HF.ws === ws) hfStop(ev.code === 4403 ? "Only an administrator can enrol voices." : "The connection closed."); };
-  ws.onopen = async () => { $("#hfBtn").textContent = "Stop / cancel"; hfStage("wake"); await hfSay(hfT().start(settings.handsfree_wake || "Secrets")); };
+  ws.onopen = async () => { $("#hfBtn").textContent = "Stop / cancel"; hfStage("wake"); await hfSay(hfT().start(settings.handsfree_wake || "Zecrets")); };
 };
 
 loadMe().then(() => { if (isAdmin()) loadMail(); });
-$("#micSel").onchange = () => { localStorage.setItem("secrets.mic", $("#micSel").value); $("#recMsg").textContent = $("#micSel").value ? "Microphone chosen: " + $("#micSel").selectedOptions[0].textContent : "Using the browser's default microphone."; };
+$("#micSel").onchange = () => { localStorage.setItem("zecrets.mic", $("#micSel").value); $("#recMsg").textContent = $("#micSel").value ? "Microphone chosen: " + $("#micSel").selectedOptions[0].textContent : "Using the browser's default microphone."; };
 $("#micRefresh").onclick = refreshMics; listMics(); if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener("devicechange", listMics);
 $("#micSel").onpointerdown = () => { if ($("#micSel").options.length < 2 || [...$("#micSel").options].every(o => !o.value)) refreshMics(); };  // nothing to choose yet: ask for the microphone
 refreshPeople(); setMode("live"); loadResume(); loadBotInfo().then(() => { renderBotCard(); botUiVisible(); });

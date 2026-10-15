@@ -22,7 +22,7 @@ TRANSCRIBE = {"vote3": (150, 4.6), "best": (120, 3.0), "pathumma-large": (90, 2.
 TRANSCRIBE_OTHER = (60, 1.0)
 SPEAKERS = (5, 0.05)
 SUMMARY = {"typhoon-30b": (600, 0.35), "typhoon-4b": (200, 0.25), "gemma4-e4b": (200, 0.3)}
-GRACE_S = int(os.environ.get("SECRET_GRACE_S", 15 * 60))  # a stage that will finish within this when the window closes is allowed to finish (tests: 0)
+GRACE_S = int(os.environ.get("ZECRET_GRACE_S", 15 * 60))  # a stage that will finish within this when the window closes is allowed to finish (tests: 0)
 
 
 def _hm(s: str) -> int:

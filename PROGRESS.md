@@ -1,6 +1,6 @@
-# Secrets – Progress & Resume File
+# Zecrets – Progress & Resume File
 
-_Renamed from "Secret" to "Secrets" on 2026-10-06 (display name only). Folder /home/dev/Secret, venv path, cookie `secret_token`, env vars SECRET_DATA/SECRET_PORT and header X-Secret-Token keep the old spelling on purpose: renaming them would sign users out / break the running app._
+_Renamed from "Zecret" to "Zecrets" on 2026-10-06 (display name only). Folder /home/dev/Secret, venv path, cookie `zecret_token`, env vars ZECRET_DATA/ZECRET_PORT and header X-Zecret-Token keep the old spelling on purpose: renaming them would sign users out / break the running app._
 
 Last updated: 2026-10-06 · Web app RUNNING on :8444; speakers, voices, report, access-code editing built and tested (see README.md)
 
@@ -23,7 +23,7 @@ FastAPI backend ── SQLite (jobs, meetings, email log)
 Worker (systemd) – checkpointed stages:
   1 recorded → 2 enhanced/VAD → 3 diarized → 4 transcribed → 5 summarized → 6 emailed
         │
-Data dir /var/lib/secret/meetings/<id>/
+Data dir /var/lib/zecret/meetings/<id>/
   audio.raw.wav, audio.16k.wav, chunks/, transcript.json, transcript.md,
   summary.md, email.eml, state.json
 ```
@@ -38,8 +38,8 @@ Resume rule: the worker reads `state.json` per meeting and restarts at the first
 - Python 3.12.3; NOT installed yet: fastapi, onnxruntime, torch, whisper libs
 
 ## Lessons from projectAI (/home/dev/projectAI, Genie Edge app – READ its README.md/RESUME.md)
-- Genie Edge app is LIVE on this box (https :8443, NPU + ~5 GB RAM + llama-server :8581). Secrets must not disturb it: own port 8444, CPU-only ASR, nice 10, one heavy model at a time. Earlier crashes were suspected RAM exhaustion (export held 29 of 34 GB).
-- NEVER use the GPU/Vulkan (Turnip): it hard-resets the box. Only one llama.cpp NPU model fits beside QNN vision, so Secrets' summary LLM runs on CPU.
+- Genie Edge app is LIVE on this box (https :8443, NPU + ~5 GB RAM + llama-server :8581). Zecrets must not disturb it: own port 8444, CPU-only ASR, nice 10, one heavy model at a time. Earlier crashes were suspected RAM exhaustion (export held 29 of 34 GB).
+- NEVER use the GPU/Vulkan (Turnip): it hard-resets the box. Only one llama.cpp NPU model fits beside QNN vision, so Zecrets' summary LLM runs on CPU.
 - Thai live ASR = Typhoon ASR realtime (NeMo FastConformer CTC, CC-BY-4.0) exported to ONNX: /home/dev/projectAI/models/typhoon-asr/ (read-only reuse, do not copy 1.1 GB). Pad 0.3 s silence both sides + normalise "ํา"→"ำ": CER 8.2→3.3% clean, 10.8→6.8% noisy. ~0.2 s per 4 s utterance on CPU.
 - Accurate pass = Thonburian distill-whisper-th-medium (CTranslate2/faster-whisper) in /home/dev/projectAI/models/whisper-th/. Thai end-of-speech silence >= 1000 ms.
 - English spoken in Thai mode becomes Thai letters → keep language setting (th / auto using confidence: Typhoon >=0.8 Thai).
@@ -66,8 +66,8 @@ Resume rule: the worker reads `state.json` per meeting and restarts at the first
 - Round 2b (same day): transcript name tags are clickable (name speaker + optional remember voice; move one line to another speaker, PUT /api/meetings/{id}/segments/{idx}/speaker); banner when voices are unnamed; "Re-analyse speakers" button; tiny clusters (<5 s or <4% of speech) are absorbed into the closest real speaker (real meeting 065847: 6 phantom speakers -> 2). Skipped when 'number of people' is set.
 - Round 3 (same day): meeting DETAILS = title (editable), remark (<=4000 chars) and participants (names, <=50, de-duplicated). Set on the Record tab (also during recording: PATCH after "started") and in each meeting; GET /api/people feeds auto-complete (enrolled voices + earlier participants). Participants who never spoke appear in the report as "did not speak" (name match is exact, case-insensitive: name speakers with the same spelling) and the overview text lists them. Details go into transcript.md/report.md headers, the Whisper prompt (names) and the summary as background context ("not said in the meeting"). Meetings list: search by title/person/remark. Per-person AI notes get NO context (it leaked remark/participant count into notes).
 - INCIDENT 10:06: I restarted the live server while 2 recordings were in progress (meetings 20261006-095917 and -100313 are *interrupted*, 56 s / 37 s of audio kept; user can Continue or Finish & process from the Record tab). Always check for active meetings in a separate step first.
-- Round 4 (2026-10-06): OPTIONAL "join from the local network". Settings -> allow_join (default OFF, join_add_attendee default on); per meeting the host ticks "Let participants join" on the Record tab (or opens it while recording): POST /api/meetings/{id}/join {open} -> secret link https://<lan-ip>:8444/join/<token> + QR (segno SVG) + list of who joined; a NEW token every time it is opened; link works ONLY while that meeting is being recorded and joining is open, closes on stop / "Stop joining". Guests (static/join.html, WS /ws/join) get a read-only stream of live captions (+ last 40 as backlog), a name is required, cap 30 guests/meeting and 6 per device, wrong link answered after 1 s, names sanitised (no < > control chars), added to participants. Guests have NO other access (every /api/* and /ws/record still need the access code). Their microphones are NOT used. Server code: app/server.py section "guests". Tested: off-state refusals, late-joiner backlog, limits, isolation (401s), ended/closed notices, Chrome host + separate-cookie-jar guest. Emoji removed from UI (this box has no emoji font).
-  Ideas not built: guests' own mics as separate audio channels (would give verified identities), view-only access to the finished transcript, mDNS name (secrets.local).
+- Round 4 (2026-10-06): OPTIONAL "join from the local network". Settings -> allow_join (default OFF, join_add_attendee default on); per meeting the host ticks "Let participants join" on the Record tab (or opens it while recording): POST /api/meetings/{id}/join {open} -> zecret link https://<lan-ip>:8444/join/<token> + QR (segno SVG) + list of who joined; a NEW token every time it is opened; link works ONLY while that meeting is being recorded and joining is open, closes on stop / "Stop joining". Guests (static/join.html, WS /ws/join) get a read-only stream of live captions (+ last 40 as backlog), a name is required, cap 30 guests/meeting and 6 per device, wrong link answered after 1 s, names sanitised (no < > control chars), added to participants. Guests have NO other access (every /api/* and /ws/record still need the access code). Their microphones are NOT used. Server code: app/server.py section "guests". Tested: off-state refusals, late-joiner backlog, limits, isolation (401s), ended/closed notices, Chrome host + separate-cookie-jar guest. Emoji removed from UI (this box has no emoji font).
+  Ideas not built: guests' own mics as separate audio channels (would give verified identities), view-only access to the finished transcript, mDNS name (zecrets.local).
 - Round 5 (2026-10-06): OPTIONAL e-mail via the user's own SMTP account (app/mailer.py, stdlib smtplib only). Settings -> Email (off by default): host/port/security (STARTTLS | SSL/TLS | none), user + password, From, default recipients, verify-certificate (default on), auto-send once after the summary (once per meeting; a failure never fails the job and a later run may retry), attachments (summary, report, transcript; the AUDIO IS NEVER ATTACHED), presets Gmail/Outlook/Yahoo (they need app passwords). Password only in data/smtp.json (0600, written atomically), never returned by any API. A login over an unencrypted connection is refused. Content is HTML-escaped; recipients validated (max 20) so header injection is impossible; subject forced to one line. Per meeting: "Email..." dialog + email_log in state.json + History lines. API: GET/PUT /api/email, POST /api/email/test, POST /api/meetings/{id}/email.
   Tested against local fake SMTP servers (aiosmtpd in a throwaway venv under the scratchpad, NOT in the app venv): STARTTLS+login, SSL+login, plain; wrong password / wrong mode / cert verify / refused / unknown host all give plain-language errors; delivered MIME checked; hostile title (HTML + CRLF Bcc) neutralised; auto-send once/failure/retry; Chrome UI flow. NOT tested against a real provider (Gmail/Outlook rules change: app password / SMTP AUTH needed).
   Note: passwords are plain text in a 0600 file (anyone with disk access can read it): use an app password, not the main account password.
@@ -98,7 +98,7 @@ Resume rule: the worker reads `state.json` per meeting and restarts at the first
   * MEASURED: 51 s synthetic Thai meeting through the production path: CPU 3.43 s CER 4.2 %, NPU 0.35 s CER 4.8 % (fp16 numerics; ~0.6 pt worse on this one small TTS sample, 25 random windows: 9/25 identical to CPU, mean similarity 0.967). In-process teardown (del + gc) did not crash; two processes can hold the NPU model at once (server + worker). End-to-end on a scratch instance: live captions on NPU, worker finished, no errors.
   * UNVERIFIED: accuracy on real human speech / noisy rooms (only synthetic TTS tested); behaviour when projectAI's Genie/vision services run at the same time (not running during tests: HTP memory could run out -> CPU fallback should catch load errors, not tested).
 - Round 11 (2026-10-07) DONE: capacity re-measured, word collection, transcript-only participant page.
-  * CAPACITY (tools/bench_capacity.py, throwaway server, captions on the NPU, 500 guests really connected): +0.36 MB RAM per guest, ~0.0007 % of all cores per guest, live meeting 1.25 % CPU (was ~2 % before the NPU), 4000 captions delivered. BUG FOUND: the benchmark's simulated guests share 127.0.0.1 and the per-device limit (JOIN_PER_IP = 6) silently refused all but 6, so the round-6 numbers were from ~6 guests; config.JOIN_PER_IP is now overridable (SECRET_JOIN_PER_IP) and the benchmark sets it and reports 'connected'. capacity.COST updated (guest 0.5 MB / 0.002 %, live 2 %). On this board (34 GB RAM, 8 cores) RAM allows ~70 000 and CPU ~1 900 guests: the real ceiling is the Wi-Fi access point / LAN and the 6-per-device rule, not the board. Setting max_guests (default 30) is the host's choice. Bot LLM (+4.5 GB) and post-processing (+4.5 GB) still fit.
+  * CAPACITY (tools/bench_capacity.py, throwaway server, captions on the NPU, 500 guests really connected): +0.36 MB RAM per guest, ~0.0007 % of all cores per guest, live meeting 1.25 % CPU (was ~2 % before the NPU), 4000 captions delivered. BUG FOUND: the benchmark's simulated guests share 127.0.0.1 and the per-device limit (JOIN_PER_IP = 6) silently refused all but 6, so the round-6 numbers were from ~6 guests; config.JOIN_PER_IP is now overridable (ZECRET_JOIN_PER_IP) and the benchmark sets it and reports 'connected'. capacity.COST updated (guest 0.5 MB / 0.002 %, live 2 %). On this board (34 GB RAM, 8 cores) RAM allows ~70 000 and CPU ~1 900 guests: the real ceiling is the Wi-Fi access point / LAN and the 6-per-device rule, not the board. Setting max_guests (default 30) is the host's choice. Bot LLM (+4.5 GB) and post-processing (+4.5 GB) still fit.
   * WORD COLLECTION: wrong=>right pairs (settings.corrections text, so live captions, guest captions and the worker all already use it). New: /api/words (list/add/delete, refuses unsafe rules: <2 Thai letters / <3 ASCII, same word, '=>' ), POST /api/meetings/{id}/apply-words (fixes a finished transcript, originals kept in seg['orig']), PUT segment returns a suggested rule (difflib; padded with neighbouring letters to >=4 base letters so it does not hit other words) shown as a 'Remember this word?' bar (Remember / Remember + fix everywhere in this meeting / No); Settings card 'Word collection' with table, add row, 'edit as text'; longest rule applied first. Browser test passes (list, sync, unsafe refused, suggestion bar, remember).
   * PARTICIPANT PAGE: transcript only (live text, speaker label, time, text size). No bot messages, no questions (GUEST_CAN_ASK = False), no summary; the join page code for them was removed.
 - Round 13 (2026-10-07) DONE: live captions too slow with a meeting VIDEO -> two causes found and fixed.
@@ -111,7 +111,7 @@ Resume rule: the worker reads `state.json` per meeting and restarts at the first
   * LIMITS: only words in loanwords.tsv are converted (a brand-new Thai spelling needs a rule in the word collection, e.g. อพอลโล=>Apollo); the ASR itself writes English in Thai letters, we map them back; ambiguous short words (e.g. แรม) are left out on purpose; single number words without a unit/context stay as words.
 - Round 15 (2026-10-07) DONE: slow after-meeting transcription + missing dialog (user: "improve speed it seems slower, some dialog have missing"), tested on the user's real 5-min meeting video (shareholder meeting, music/room noise, fast formal Thai).
   * MISSING DIALOG: Silero VAD (threshold 0.45; even 0.15) skipped whole sentences under music/room noise (7 of the 14 uncovered stretches contained clear speech: Typhoon read them with conf 0.86-0.94). The worker's chunks came only from the VAD / speaker analysis. FIX: asr.fill_gaps finds stretches that are clearly louder than the background (p10 floor x2.5) and not covered by any chunk (+-0.3 s); worker.fill_missed joins each to a neighbouring chunk (<= 2 s away, result <= 28 s: every Whisper call costs a full 30 s window) or, if isolated, adds a chunk that is kept only if the fast Typhoon pass finds >= 6 characters with conf >= 0.6 (src 'silence' otherwise). Marker file chunks.filled; jobs planned by older versions are migrated automatically (partial results deleted, chunks re-planned) - 'Transcribe again' also removes the marker. Result on the 5-min video: 32 segments instead of 20, previously missing sentences (118-128 s, 251-256 s, 291-325 s incl. share counts) now present.
-  * SPEED (accurate pass): measured with ground truth (51 s synthetic Thai, 4 cores): beam 5 + temperature fallback = CER 3.4 % in 145 s; beam 2 single pass = 3.4 % in 57 s; beam 1 = 4.2 % in 37 s; distil-whisper-th-small = 8.5-9 % (rejected). -> WhisperTH uses beam 2, temperature 0. Worker affinity widened from cores 4-7 to all 8 (jobs only start when nothing is recording, worker is nice 10; env SECRET_WORKER_CORES='4-7' for tests), Whisper cpu_threads = 8, summary llama-server -t 8 without taskset. Old numbers for the 5-min meeting: transcribe 635 s + summary 382 s.
+  * SPEED (accurate pass): measured with ground truth (51 s synthetic Thai, 4 cores): beam 5 + temperature fallback = CER 3.4 % in 145 s; beam 2 single pass = 3.4 % in 57 s; beam 1 = 4.2 % in 37 s; distil-whisper-th-small = 8.5-9 % (rejected). -> WhisperTH uses beam 2, temperature 0. Worker affinity widened from cores 4-7 to all 8 (jobs only start when nothing is recording, worker is nice 10; env ZECRET_WORKER_CORES='4-7' for tests), Whisper cpu_threads = 8, summary llama-server -t 8 without taskset. Old numbers for the 5-min meeting: transcribe 635 s + summary 382 s.
   * STILL SLOW BY NATURE: every Whisper call = one 30 s encoder pass on the CPU (medium encoder), so cost ~ number of chunks; real-time factor of the accurate mode is about 1 on this board. 'fast' accuracy (Typhoon on the NPU) is ~100x real time. Ideas not done: run the Whisper pass while the meeting is still being recorded, Whisper encoder on the NPU (CTranslate2 cannot take external encoder output).
 - Round 16 (2026-10-07) DONE: two worker lanes (user: "separate 2 thread task: 1. transcribe, then another thread collects as post task, no need on the fly").
   * worker.py now runs two daemon threads: lane 'transcribe' (stage transcribe only; owns the ASR models) and lane 'post' (stages speakers, summarize, report; owns the speaker model + the summary LLM). A meeting is still sequential (transcribe -> speakers -> summary -> report, via its single 'queue' field) but the transcript is final and readable as soon as lane 1 finishes, and lane 1 starts the NEXT meeting immediately while lane 2 is still summarising the previous one. Models are released per lane after 45 s idle. SIGTERM: main thread raises SystemExit, lanes are daemon threads, LlamaServer registers an atexit kill (a thread cannot unwind its 'with'); llama-server runs at nice 15 so Whisper (nice 10) wins the cores when both lanes work.
@@ -175,15 +175,15 @@ Resume rule: the worker reads `state.json` per meeting and restarts at the first
 - Verified: end-to-end WS recording → live labels → worker → summary+report; API (enrol, match, name, remember, merge, validation, access code change: old code 401, new 200); headless Chrome UI (all tabs, no JS errors); identify-speakers-only stage.
 - NOT verified: voice matching on REAL Thai voices across sessions (tests used pitch-shifted synthetic TTS voices and the same clip for enrol+match, so scores ~0.98 are inflated); thresholds 0.5 are untuned. Questions metric is a keyword heuristic.
 - Cost: speaker analysis ~0.05x real time; narratives add ~1 min per 3 people to the summary step.
-- User's REAL meetings 20261006-065133, -065847 were processed before speakers existed: use "Identify speakers now" (keeps edits). -065742 is an interrupted recording (Continue/Finish banner). Never delete them; tests use a scratch instance: SECRET_DATA=<scratch> SECRET_PORT=8445 .venv/bin/python app/server.py
+- User's REAL meetings 20261006-065133, -065847 were processed before speakers existed: use "Identify speakers now" (keeps edits). -065742 is an interrupted recording (Continue/Finish banner). Never delete them; tests use a scratch instance: ZECRET_DATA=<scratch> ZECRET_PORT=8445 .venv/bin/python app/server.py
 
 ## Run / resume
-Runs as systemd `secrets.service` (since 2026-10-13): `sudo systemctl restart secrets`, logs data/server.log. Do NOT also start ./run.sh by hand (port 8444). Then https://<box-ip>:8444 (code in data/access.token). Don't `pkill -f app/server.py` from a shell whose command line contains that text.
+Runs as systemd `zecrets.service` (since 2026-10-13): `sudo systemctl restart zecrets`, logs data/server.log. Do NOT also start ./run.sh by hand (port 8444). Then https://<box-ip>:8444 (code in data/access.token). Don't `pkill -f app/server.py` from a shell whose command line contains that text.
 Verified failure handling: worker kill -9 mid-transcription → server restarts it → resumes from checkpoint; interrupted recording → Continue/Finish banner.
 
 ## Next
 1. Benchmark on REAL Thai meeting audio (Typhoon vs Whisper-th vs combined, CER, RTF); tune VAD / glossary. Accurate pass RTF ~1.1 (1 h meeting ≈ 1 h processing, runs in background).
-2. Tune speaker thresholds on real recordings (Thai voices); check real-meeting report usefulness. 3. P9 start at boot: DONE 2026-10-13 (systemd secrets.service). 4. P7 email when user asks.
+2. Tune speaker thresholds on real recordings (Thai voices); check real-meeting report usefulness. 3. P9 start at boot: DONE 2026-10-13 (systemd zecrets.service). 4. P7 email when user asks.
 Known: LLM summary can repeat ASR mistakes (แผล for แผน) → use Settings glossary/corrections; test summary invented a deadline once (prompt tightened, re-check on real data).
 
 ## Open questions
@@ -228,18 +228,18 @@ User: "merge the features we never had"; chose ALL A–G, deploy live only when 
 - [ ] E header: disk storage + GPU (read only), show/hide setting; microphone device selection
 - [ ] F accounts + RBAC (Admin/Member/Viewer, ownership, 8 h sessions, CSRF, throttling, >=12 char passwords, HTTPS for remote, first-admin setup, SSO dummy page) + new sign-in page
 - [ ] G experimental hands-free enrolment (wake "Hey Zecret"/Thai, speechSynthesis guidance, auto quality stop, name ask/confirm)
-- [x] F DONE (scratch-tested, not deployed yet): app/auth.py (users.json/sessions.json 0600, scrypt, 8 h sessions, CSRF double-submit cookie secret_csrf + X-CSRF-Token, Origin check on writes + WS, throttling 5/user 20/IP per 15 min, >=12 chars, HTTPS required unless loopback). Middleware require_auth = central policy (ADMIN_GET / ADMIN_WRITE / MEMBER_WRITE / meeting owner via MEETING_RE). state.owner set at creation; old meetings unowned -> admin assigns (/api/meetings/assign, /api/meetings/{id}/owner, never reassigns). First admin: /login setup form needs the setup code = old data/access.token. static/login.html (two-panel, theme, show/hide, caps lock). /sso dummy. Bench: SECRET_BENCH_TOKEN env. Tests: scratch test_f.py 51/51, ui_f.py 27/27.
+- [x] F DONE (scratch-tested, not deployed yet): app/auth.py (users.json/sessions.json 0600, scrypt, 8 h sessions, CSRF double-submit cookie zecret_csrf + X-CSRF-Token, Origin check on writes + WS, throttling 5/user 20/IP per 15 min, >=12 chars, HTTPS required unless loopback). Middleware require_auth = central policy (ADMIN_GET / ADMIN_WRITE / MEMBER_WRITE / meeting owner via MEETING_RE). state.owner set at creation; old meetings unowned -> admin assigns (/api/meetings/assign, /api/meetings/{id}/owner, never reassigns). First admin: /login setup form needs the setup code = old data/access.token. static/login.html (two-panel, theme, show/hide, caps lock). /sso dummy. Bench: ZECRET_BENCH_TOKEN env. Tests: scratch test_f.py 51/51, ui_f.py 27/27.
 - [x] A DONE (scratch): per-line v (409 on stale), history[] {from,to,by,at,kind}, undo endpoint, review mark, apply-words skips reviewed, reprocess transcribe 409 when review_count>0, store.transcript_lock (also fixed do_speakers overwriting edits made during analysis). Review sub-tab. Term suggestions -> data/vocab_suggestions.json (pending; admin approves into a pack in Vocab tab). test_a 20/20, ui_a 16/16.
 - [x] B DONE (scratch): summary-history.json via store.add_summary_history (edit/restore by user, 'ai' when the worker replaces a summary), PUT summary needs base=text_rev (409 on stale), state.summary_edited_by, "Change history" dialog. test_b 11/11.
 - [x] C DONE (scratch): pack rev (vocab.save bumps; check_rev -> 409), pack context (<=500 chars, into the summary background via vocab.contexts), entry aliases (shown/searched/exported, never replace rules), import_bytes (<=1 MB, strict UTF-8, no NUL, <=5000 lines, <=5 columns), file import sends bytes (b64). New starter pack business-services (app/vocab_services.py, 100 terms, OFF; spellings checked with pythainlp in scratch venv-thai: dropped พีโอ, สโคป) + ADDITIONS r31 merged once into existing insurance/law packs (brokers/agents, bancassurance, CMI, Motor Vehicle Accident Victims Protection Act 2535, OIC full name, TGIA/TLAA). Auto term suggestions only for Thai->Latin corrections. test_c 25/25.
-- [x] E DONE (scratch): capacity.gpu_info (devfreq 3d00000.gpu clock, gpuss thermal, holders of /dev/dri/renderD*, read only) + disk_info + meetings/voices size; header gauges Disk/GPU, settings res_cpu/ram/npu/gpu/disk; mic picker on Record tab (localStorage secrets.mic, fallback to default when unplugged). ui_e 12/12.
+- [x] E DONE (scratch): capacity.gpu_info (devfreq 3d00000.gpu clock, gpuss thermal, holders of /dev/dri/renderD*, read only) + disk_info + meetings/voices size; header gauges Disk/GPU, settings res_cpu/ram/npu/gpu/disk; mic picker on Record tab (localStorage zecrets.mic, fallback to default when unplugged). ui_e 12/12.
 - [x] D DONE (scratch): app/voicelib.py: quality() (VAD speech s, consistency = mean cosine of 4 s windows to their centroid, single voice = clustering 0.5 with a >=20 % second group / min sim 0.35; min 10 s, target 20 s + 0.75), drafts (data/voices_drafts, 30 min) with preview WAV, commit (consent required; add to person or explicit replace), <=40 s retained speech per person in data/voices/<vid>/ (0700/0600), notes, delete audio / person. /ws/enroll now returns a draft (?auto=1 = quality checks from 22 s every 5 s, stops when good, cap 40 s). Upload: browser decodes any audio to 16 kHz PCM -> /api/voices/analyze. Voices tab = Voice library + Enrol a voice sub-tabs. Measured: one voice 25 s -> 0.905 good; 15+15 s real+synthetic voice -> 2 groups refused; 22+8 refused; 27+4 NOT detected (limit). ui_d 17/17.
 - TTS for G: app/tts.py + tts_child.py run projectAI/.venv python with Piper th_TH-tsync2-medium (CC BY-NC-SA 3.0 NON-COMMERCIAL) + en lessac, projectAI app/thai_speech normaliser (read-only reuse). First call ~8 s, then ~0.3 s; cache data/tts-cache.
 - G (2026-10-10 resume check): code present: app/handsfree.py (parser: wake/command/consent/name/confirm, polite endings, ร=ล, sensitivity presets 90/80/70), /ws/handsfree (admin, Typhoon ASR per utterance, 0.7 s pause), /ws/enroll ?auto=1 quality stop, Voices -> Enrol hands-free card (gain, prompt volume, sensitivity), Settings handsfree_enroll (OFF) / wake / lang, app/tts.py Piper. Parser test 15/15 after FIX (bare "ครับ" at confirm was not 'yes': ร→ล normalisation applied to text only). NOT yet browser-tested end to end with a fake mic; real-mic test is the user's.
 - DEPLOY STATE: live server (8444) restarted 23:27 on the Round 31 code; no data/users.json yet -> first admin must be created at /login with the setup code (= data/access.token). Existing meetings are unowned/read-only until the admin assigns an owner.
 
 ## Round 32 — Settings split into sub-tabs (2026-10-10)
-- index.html: #setSub row (same .tabs pattern as Voices #vSub); each Settings card has data-sg = asr (Processing, NPU speech, Processing order, Microphone) | voice (Speakers, Participants enrol, Enrolment guide, Hands-free) | words (Vocabulary, Word collection, Planned meetings & documents) | integ (Meeting bot, Email, Join from network) | sys (Capacity & limits, Header bar) | acc (Accounts & roles, Meetings without owner, My account, SSO). setSub() shows one group, remembers it (localStorage secrets.setSub), hides "Save settings" on Accounts; non-admins only get Accounts (My account). One Save button still saves all groups.
+- index.html: #setSub row (same .tabs pattern as Voices #vSub); each Settings card has data-sg = asr (Processing, NPU speech, Processing order, Microphone) | voice (Speakers, Participants enrol, Enrolment guide, Hands-free) | words (Vocabulary, Word collection, Planned meetings & documents) | integ (Meeting bot, Email, Join from network) | sys (Capacity & limits, Header bar) | acc (Accounts & roles, Meetings without owner, My account, SSO). setSub() shows one group, remembers it (localStorage zecrets.setSub), hides "Save settings" on Accounts; non-admins only get Accounts (My account). One Save button still saves all groups.
 - Headless Chrome (CDP, scratch :8445): 14/14, no JS errors. Live immediately (index.html is served from disk, no-store).
 - KNOWN (pre-existing, not from this change): at 390 px the top nav (536 px) and header gauges (Disk/GPU, 404 px) overflow horizontally.
 - Round 32b FIX Stats tab: the meetings table (17 cols) ran ~60 px past its card (row lines outside the card). Now: wrapped in .tw (scrolls inside the card), Stats uses main.wide like Meetings, #sTbl overrides the Meetings-list .tbl media rules (they hid its cols 7-8 < 1100 px and turned it into cards < 600 px), cells nowrap except Meeting / Speech engine / Summary model (wrap, <= 170 px). Checked on a copy of live data: 1400 px fits fully, 1000 px scrolls inside the card.
@@ -267,7 +267,7 @@ User: "merge the features we never had"; chose ALL A–G, deploy live only when 
 
 ## Round 36 (2026-10-11): colour themes per account
 - My account (Settings -> Accounts) has Theme: Device (follow OS, the default) · White · Dark, and for administrators also Gray. Saved per account in users.json ("theme"; values auto/light/dark/gray) via POST /api/me/theme and returned by GET /api/me (theme, themes). Gray is refused for non-admins (400), and if an admin becomes a Member, a stored gray falls back to Device.
-- static/theme.css (public path) holds the three palettes and is loaded after each page's <style> in index/login/guide/join/enroll. An inline head script applies localStorage "secrets_theme" (the key the login page already used) so pages paint in the theme before /api/me answers.
+- static/theme.css (public path) holds the three palettes and is loaded after each page's <style> in index/login/guide/join/enroll. An inline head script applies localStorage "zecrets_theme" (the key the login page already used) so pages paint in the theme before /api/me answers.
 - Tested with scratch ui_theme.py: 15/15 (admin 4 options, 3 distinct backgrounds, kept after reload, member 3 options, API refuses gray, Device clears it, login page follows, stored per account, no JS errors). Deployed live.
 - Ops: `pgrep -f run.sh` inside a command that itself contains "run.sh" always matches the shell, so the live server was not restarted. Start run.sh unconditionally after confirming the old pid is gone.
 
@@ -286,7 +286,7 @@ Downloaded from huggingface.co/nectec into models/pathumma (about 24 GB). Live s
   digits ("2.4 GHz") are penalised a little.
 - ASR (Settings -> Accuracy):
   * pathumma-rnnt = Pathumma STT FastConformer-RNNT large (CC-BY-4.0, NeMo .nemo 0.46 GB). app/rnnt.py (client, QwenASR protocol) + app/nemo_server.py,
-    run with config.NEMO_PY (default /mnt/genie/projectAI/export/venv-nemo, override SECRET_NEMO_PY). CER 6.65 %, RTF 0.10 (95 s for 15.9 min):
+    run with config.NEMO_PY (default /mnt/genie/projectAI/export/venv-nemo, override ZECRET_NEMO_PY). CER 6.65 %, RTF 0.10 (95 s for 15.9 min):
     BETTER and 5x FASTER than the default Thonburian (7.17 %, RTF 0.54 on the same set). End-to-end worker run on the 5.4-min meeting: 41 s, 20/20
     segments from Pathumma. The best candidate for a new default (not switched: the user's choice). Also a candidate for live captions (not done).
   * pathumma-medium = Pathumma Whisper medium (Apache-2.0) -> CT2 int8 (models/pathumma/whisper-th-medium-ct2, tokenizer.json generated with
@@ -305,7 +305,7 @@ Downloaded from huggingface.co/nectec into models/pathumma (about 24 GB). Live s
   * Pathumma-F5-TTS (MIT): .venv-f5 (pip f5-tts, torch 2.14), EMA weights extracted to f5-tts/model_ema.safetensors (1.3 GB; model.pt 5.4 GB is
     the training checkpoint, can be deleted). Architecture F5TTS_v1_Base (F5TTS_Base gives noise: ASR read-back CER 100 %). Reference voice:
     models/pathumma/f5-ref.wav = FLEURS th test id 1662 (CC-BY-4.0, see f5-ref.SOURCE.txt), never a participant.
-  * SPEED on this CPU: 16 steps 90 s, 8 steps 48 s for 4.4 s of speech; both read back word-perfect by the FastConformer. Default 8 (SECRET_F5_NFE).
+  * SPEED on this CPU: 16 steps 90 s, 8 steps 48 s for 4.4 s of speech; both read back word-perfect by the FastConformer. Default 8 (ZECRET_F5_NFE).
   * Too slow for a live dialogue, so tts.py: a sentence F5 has made is served from data/tts-cache/f5; any other sentence is spoken by Piper at once
     and queued for F5 (background thread, nice 15, pauses and stops the helper while a meeting is recording). Saving Settings with the Pathumma
     voice queues the fixed guidance sentences (POST /api/tts/prewarm, GET /api/tts/status; admin). Tested: 10 sentences about 57 s each, then served
@@ -324,7 +324,7 @@ Downloaded from huggingface.co/nectec into models/pathumma (about 24 GB). Live s
   "Start anyway" / Cancel; failures -> red items + "Check again" (cannot start). "Check system" button runs it without starting.
 - During the meeting a strip under the timer: "● Transcribing live: <model · NPU/CPU>", "After the meeting: <model really used>", "Summary: <model>"
   (from the 'started' WebSocket message; the server now loads the live model before sending it).
-- Test scratch ui_pf.py (fake microphone, FastConformer made unavailable with SECRET_NEMO_PY): 11/11. Deployed live.
+- Test scratch ui_pf.py (fake microphone, FastConformer made unavailable with ZECRET_NEMO_PY): 11/11. Deployed live.
 
 ## Round 40 (2026-10-11): Pathumma FastConformer = default (live captions + after the meeting); host 0.0.0.0
 - Defaults: config accuracy "pathumma-rnnt", live_engine "pathumma-rnnt". The user's live settings.json switched too (was npu / typhoon;
@@ -333,11 +333,11 @@ Downloaded from huggingface.co/nectec into models/pathumma (about 24 GB). Live s
 - Live engine rnnt.PathummaLive (ThaiCTC interface, 4 threads, started at once). Measured: an 8-s sentence 0.94 s (2 threads 1.17 s); start 15 s;
   2.1 GB RAM. Interim text every 3 s (PARTIAL_GAP). It stays loaded when idle (the NPU model is still released after 90 s), so the check before
   a meeting answers in ~0.3 s. Test with real speech through Chrome's fake microphone (3 FLEURS clips): captions + interim text, check + start
-  in 2 s, no warnings (scratch ui_live.py 6/6); fallback path checked with SECRET_NEMO_PY=/nonexistent.
+  in 2 s, no warnings (scratch ui_live.py 6/6); fallback path checked with ZECRET_NEMO_PY=/nonexistent.
 - BUG FOUND + FIXED: helper processes use PR_SET_PDEATHSIG, which fires when the THREAD that started them ends. The server warms the live model
   in a short-lived thread, so the NeMo child was killed (-15) seconds after start. config.spawn() starts children from one long-lived thread;
   used by rnnt, tts (Piper / F5) and summarize (llama-server).
-- Host: config.HOST (env SECRET_HOST, default 0.0.0.0, as before); the server already listened on 0.0.0.0:8444.
+- Host: config.HOST (env ZECRET_HOST, default 0.0.0.0, as before); the server already listened on 0.0.0.0:8444.
 
 ## Round 41 (2026-10-11): people talking at the same time (overlap detection + voice separation); PERFORMANCE.md
 - app/separation.py:
@@ -496,7 +496,7 @@ and transcribed with correction by human afterward".
   worker's own eta_s.
 - Worker: next_job only takes a meeting inside the window or with state "rush". check_window() at every checkpoint (each transcript piece,
   the overlap / phone passes, every Eta progress tick of speakers and summary): outside the window it raises Deferred (BaseException) unless
-  the stage will finish within GRACE_S (15 min; env SECRET_GRACE_S for tests); run_job puts the meeting back in its queue (attempt not counted,
+  the stage will finish within GRACE_S (15 min; env ZECRET_GRACE_S for tests); run_job puts the meeting back in its queue (attempt not counted,
   history "paused: … goes on from here at …"); the transcript resumes from transcript.partial.jsonl, the summary from its map checkpoints.
 - Server: GET /api/queue (estimate + window), POST /api/queue/{mid}/now (admin, any owner's meeting; ?rush=0 = wait again). Reprocess asked
   by an admin = rush; by a member it waits for the window. finish_recording sets rush False.
@@ -529,12 +529,12 @@ and transcribed with correction by human afterward".
 - Test ui_recqr.py 10/10 (placeholder + turn on, QR right of Start on the same row at 1400 px, inside the screen at 390 px, untick hides,
   tick shows, no JS errors). index.html is served from disk (no-store): live without a restart.
 
-## 2026-10-13: box rebooted, Secrets was down
-- The box rebooted (~07:41). genie-edge (projectAI) starts by itself as a systemd service, but Secrets didn't (Next item 3 "P9 start at boot").
+## 2026-10-13: box rebooted, Zecrets was down
+- The box rebooted (~07:41). genie-edge (projectAI) starts by itself as a systemd service, but Zecrets didn't (Next item 3 "P9 start at boot").
   Restarted by hand with setsid nohup ./run.sh (server 5242, worker 5271); /login 200. The last meeting (20261012-222912, 14 s test) had
   finished before the reboot (vote3 transcript, speakers, summary).
-- tools/secrets.service (+ tools/install-service.sh: installs, enables, hands over from a hand-started copy unless recording): a systemd unit like genie-edge's (User dev, render/video/audio/dmaheap, RequiresMountsFor /mnt/project2,
-  Restart=on-failure, SIGINT). INSTALLED by the user 2026-10-13 09:09 (enabled, active; old hand-started copy gone). Restart: sudo systemctl restart secrets.
+- tools/zecrets.service (+ tools/install-service.sh: installs, enables, hands over from a hand-started copy unless recording): a systemd unit like genie-edge's (User dev, render/video/audio/dmaheap, RequiresMountsFor /mnt/project2,
+  Restart=on-failure, SIGINT). INSTALLED by the user 2026-10-13 09:09 (enabled, active; old hand-started copy gone). Restart: sudo systemctl restart zecrets.
 
 ## Round 47 (2026-10-13): recording comes first: everything pauses while a meeting is recorded
 - User: "how to process the meeting when summarizing and meeting at the same time? ... we need to have the most accurate and on time".
@@ -549,7 +549,7 @@ and transcribed with correction by human afterward".
   then). _wake() (SIGCONT) before every terminate: a stopped process ignores SIGTERM. data/.llm.pid + summarize.kill_orphan() at worker
   start: kills a frozen copy left by a worker that died (PDEATHSIG is SIGTERM, ignored while stopped).
 - stats.stage: secs excludes paused_rec_s (set by run_job), so speed estimates (schedule._ratio) and Stats are not inflated by recordings.
-- Test scratchpad test_pause.py on a scratch instance (SECRET_PORT 8460, Typhoon 4B CPU): 18/18 (Eta waits 14 s + paused phase + restored +
+- Test scratchpad test_pause.py on a scratch instance (ZECRET_PORT 8460, Typhoon 4B CPU): 18/18 (Eta waits 14 s + paused phase + restored +
   history + counted; model state T while recording, R after, answer arrives; on/off events; timed-out call retried and answered; exit while
   frozen stops it; frozen copy ignores SIGTERM, kill_orphan removes it) + stats secs 3.0-2.0 = 1.0. Not tested on the NPU summary path.
 - Deployed: worker restarted 09:32 (pid 25331; server unchanged). Nothing was recording or queued.
@@ -580,7 +580,7 @@ and transcribed with correction by human afterward".
 
 ## Round 49 (2026-10-13): phone layout of the top bar (fixes the KNOWN item of Round 32)
 - Was: at 390 px the menu (536 px) made the page 535 px wide (the phone zoomed out) and the sticky header was 241 px tall.
-- index.html (UI only, live from disk; backup app/static/index.html.bak-navphone), @media (max-width:760px): row 1 = Secrets + account,
+- index.html (UI only, live from disk; backup app/static/index.html.bak-navphone), @media (max-width:760px): row 1 = Zecrets + account,
   then the gauges and the worker chip flowing together (.meters display:contents; a header::after line break), then the menu as one
   swipeable row (overflow-x auto, no scrollbar, faded edges). show() scrolls the open tab into view in the menu.
   select{max-width:100%} + Stats filter items min-width:0: the long "Compare" option had made the Stats tab 463 px wide at 360 px.
@@ -588,7 +588,7 @@ and transcribed with correction by human afterward".
 - Test scratchpad ui_nav.py on a scratch instance: 60/60 (every tab at 360/390/600/800/1300: page exactly the screen width; Settings tab
   reachable and opens; open tab in view in the menu, also when switched by code; no JS errors).
 - Also 2026-10-13: CLAUDE.md written for this project and for Genie Edge (/mnt/genie/projectAI): the two projects are kept apart, each
-  has its own Claude session; Secrets only uses Genie's models / venvs read-only (config.PROJECT_AI, NEMO_PY, tts.py).
+  has its own Claude session; Zecrets only uses Genie's models / venvs read-only (config.PROJECT_AI, NEMO_PY, tts.py).
 
 ## Round 50 (2026-10-15): sound check before a meeting + no-sound watchdog during it (never miss a recording)
 - Why: the check before a meeting (Round 39) only opened the microphone and read its level for 1.5 s; in Record-only mode nothing proved
@@ -605,12 +605,12 @@ and transcribed with correction by human afterward".
   status line once the recording starts ("Sound check ✓ heard “…”").
 - /api/preflight: new item "Recording storage": a file is written + fsynced + removed in data/meetings (fail = no recording possible).
 - During the meeting: the level meter now works in Record-only mode too (packet peak - 10 dB). Server watchdog (a task next to the recorder's
-  socket, so it also fires when no audio packets arrive at all): no packet above -50 dB peak for SECRET_SILENT_S (60 s) -> {"type":"notice",
+  socket, so it also fires when no audio packets arrive at all): no packet above -50 dB peak for ZECRET_SILENT_S (60 s) -> {"type":"notice",
   "kind":"silent"} -> red line under the status "⚠ No sound for 60 s: is the microphone muted or unplugged? Say something to test it."
   (also logged in the meeting's history); sound again -> cleared. Browser: the microphone track is watched: 'mute' -> warning, 'unmute' ->
   cleared, 'ended' (USB microphone unplugged) -> the default microphone is opened and connected to the running worklet, "⚠ Microphone changed
   to “…”: check that it picks up the room." (no microphone left -> "nothing is being recorded, plug one in or press Stop").
-- Tests (scratch instance 8445, SECRET_SILENT_S=3; now kept in tools/tests/): test_soundcheck_api.py 16/16 (storage item, speech sample live +
+- Tests (scratch instance 8445, ZECRET_SILENT_S=3; now kept in tools/tests/): test_soundcheck_api.py 16/16 (storage item, speech sample live +
   Record-only with Pathumma text in ~0.8 s, silence -> fail, noise only -> warn, quiet -> warn, clipped -> warn, empty, 413, member 200,
   viewer 403), test_soundcheck_ws.py 7/7 (level numbers in Record-only, notice after 5 s of silence, cleared when speech resumes, event logged),
   test_soundcheck_ui.py with headless Chrome + a WAV as fake microphone: speech 15/15 (prompt + bar shown, items, Start after the check, meter
@@ -655,7 +655,7 @@ and transcribed with correction by human afterward".
 - Qualcomm AI Hub ships Gemma-4-E4B-it and E2B-it for Dragonwing IQ-9075 (= this QCS9075): GENIEX_QAIRT w4a16 7.9 tok/s (TTFT 0.3-8.9 s at
   4096 ctx), GENIEX_LLAMACPP q4_0 10-13 tok/s (TTFT up to 67 s at 4096 ctx). Bundles are built on QAIRT 2.45; this box has QAIRT 2.46
   (/usr/lib/libQnnHtp.so v2.46.0, libGenie.so, /usr/bin/genie-t2t-run). The classic Genie runtime is "deprecated soon"; GenieX is the new one.
-- Zero-engineering route for Secrets: the llama.cpp-snapdragon build already in use (0.5.0-dev b11269) lists the gemma4 architecture, and its
+- Zero-engineering route for Zecrets: the llama.cpp-snapdragon build already in use (0.5.0-dev b11269) lists the gemma4 architecture, and its
   Hexagon backend repacks Q4_0 / Q4_K / Q8_0 / MXFP4, so ggml-org/gemma-4-E4B-it-GGUF Q4_0 (4.6 GB) should run through summarize.LlamaServer
   like Typhoon 4B (Typhoon 4B Q4_0 is 2.5 GB: E4B needs ~2 GB more RAM; NPU layer count to find by trial, ngl 24 -> 20 -> 12 -> CPU).
   26B-A4B Q4_0 is 14.6 GB (CPU only, like Typhoon 30B-A3B, 3.8B active -> similar ~7 tok/s); 12B Q4_0 ~7 GB.
