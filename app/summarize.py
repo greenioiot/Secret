@@ -368,9 +368,19 @@ def _checkpoint(mid: str):
     return f, part
 
 
-def background(glossary: str, context: str, terms: list[str] | None = None, coverage: list[dict] | None = None) -> str:
+def background(glossary: str, context: str, terms: list[str] | None = None, coverage: list[dict] | None = None, P: dict | None = None) -> str:
     out = ""
     words = [w for w in ([glossary.strip()] if glossary.strip() else []) + (terms or [])[:30]]
+    if P is not None and P is PROMPTS["en"]:
+        if words:
+            out += "\nCorrect spellings of names / terms (for spelling only; do not mention them unless the notes do): " + ", ".join(words)
+        if coverage:
+            no = [c["title"] for c in coverage if not c["covered"]]
+            if no:
+                out += "\nAgenda items not discussed in the notes (never invent a decision or content for them): " + " | ".join(no)
+        if context.strip():
+            out += f"\nBackground information (NOT something said in the meeting; never summarize it as meeting content):\n{context.strip()[:1500]}"
+        return out
     if words:
         out += f"\nคำศัพท์/ชื่อที่สะกดถูกต้อง (ใช้เพื่อสะกดคำเท่านั้น ห้ามกล่าวถึงคำเหล่านี้ถ้าไม่มีอยู่ในบันทึก): {', '.join(words)}"
     if coverage:
@@ -396,6 +406,55 @@ def references(mid: str, text: str, k: int = 2, limit: int = 600) -> str:
     if not hits:
         return ""
     return "\nเอกสารประกอบ (ใช้ตรวจชื่อ คำศัพท์ และบริบทเท่านั้น ไม่ใช่สิ่งที่พูดในที่ประชุม):\n" + "\n".join(f"[{h['name']}] " + " ".join(h["text"].split())[:limit // k] for h in hits)
+
+
+SYS_EN = ("You are a professional minute-taker summarizing a meeting. Answer in English only. Use only what is in the notes: never invent or guess; "
+          "write \"none\" when there is nothing. The notes come from speech recognition and may contain misheard words: read them carefully in context. "
+          "When a speaker's name precedes a line, use it to say who is responsible. Write numbers as digits (15, 500,000) and copy figures, amounts and "
+          "dates exactly as written: never convert units or recompute.")
+MAP_TASK_EN = ("This is one part of a meeting's notes. Summarize it in at most 7 bullet points: topics discussed, what was agreed or decided, "
+               "action items (who does what, by when), and the important numbers, dates and names.")
+PERSON_TASK_EN = ("Below is what {name} said in the meeting. Summarize it in at most 5 short bullet points: the main points / opinions put forward, "
+                  "commitments made or tasks received (if any), important questions asked. Use only {name}'s own lines, never guess, no duplicate points; "
+                  "skip a heading that has nothing, do not write \"none\". Do not count people or mention anything outside {name}'s lines.")
+FINAL_TASK_EN = ("From the meeting notes below, write the meeting summary in Markdown using exactly these headings (add no other):\n"
+                 "## Overview\n(4-6 sentences: what the meeting was about, who took part, the main points and the overall conclusion)\n"
+                 "## Key points\n(detailed bullet points covering everything discussed, with numbers, names and reasons)\n"
+                 "## Open items / follow-up\n(bullet points: matters left undecided or to be discussed again)")
+DECISION_TASK_EN = ("Below are sentences from the meeting that concern decisions. Write the \"Decisions\" list as bullet points in the form: "
+                    "subject – outcome (e.g. approved / agreed / noted / rejected) – details, figures or votes (if any). "
+                    "Use only these sentences, never guess or add; merge duplicates; keep time order.")
+ACTION_TASK_EN = ("Below are sentences from the meeting that concern tasks and assignments. Write the \"Action items\" list as bullet points in the form: "
+                  "owner – task – deadline; write \"not stated\" when a sentence gives no owner or deadline. "
+                  "Use only these sentences, never guess or add; merge duplicates.")
+DECISION_RE_EN = re.compile(r"\b(decid\w*|agree\w*|approv\w*|resol\w*|vot\w*|unanimous\w*|motion|conclu\w*|final(?:ly|ize|ise)\w*|sign(?:ed)? off|go ahead|green.?light)\b", re.I)
+ACTION_RE_EN = re.compile(r"\b(action item|to.?do|assign\w*|responsib\w*|owner|deadline|due|by (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|next|end of|eod|eow|the \d|\d)|will (?:send|prepare|follow|check|share|draft|update|set up|schedule|report|contact|review|finish|deliver|write)|"
+                           r"follow.?up|take care of|take the lead|circulate|get back to|needs? to|has? to|must|should|please (?:send|prepare|check|share|draft|update|review))\b", re.I)
+PROMPTS = {
+    "th": {"SYS": None, "MAP": None, "PERSON": None, "FINAL": None, "DECISION": None, "ACTION": None, "DEC_RE": None, "ACT_RE": None,  # filled below (the Thai texts above)
+           "H": ("ภาพรวม", "ประเด็นสำคัญ", "มติ / ข้อตัดสินใจ", "งานที่ต้องทำ", "ประเด็นค้าง / ต้องติดตาม", "รายละเอียดตามช่วงเวลา"),
+           "NONE": ("ไม่พบการระบุมติหรือการตัดสินใจในบันทึก", "ไม่พบการมอบหมายงานในบันทึก", "ไม่พบประเด็นค้างที่ระบุไว้ในบันทึก"),
+           "NOTES": "บันทึก", "SHORT": "บันทึกย่อ", "SENT": "ประโยค", "PART": "ส่วนที่", "EMPTY": "## ภาพรวม\nไม่พบเนื้อหาการสนทนาในการบันทึกนี้\n"},
+    "en": {"SYS": SYS_EN, "MAP": MAP_TASK_EN, "PERSON": PERSON_TASK_EN, "FINAL": FINAL_TASK_EN, "DECISION": DECISION_TASK_EN, "ACTION": ACTION_TASK_EN,
+           "DEC_RE": DECISION_RE_EN, "ACT_RE": ACTION_RE_EN,
+           "H": ("Overview", "Key points", "Decisions", "Action items", "Open items / follow-up", "Details by time"),
+           "NONE": ("No decision was stated in the notes", "No task or assignment was stated in the notes", "No open item was stated in the notes"),
+           "NOTES": "Notes", "SHORT": "Short notes", "SENT": "Sentences", "PART": "part", "EMPTY": "## Overview\nNo conversation was found in this recording.\n"},
+}
+
+
+def prompts(mid: str) -> dict:
+    """The prompt set of this meeting's language (state "language": th | th-en | en). Thai + English meetings use the Thai prompts, which already
+    keep English names and terms as written, plus a line saying both languages occur."""
+    lang = (store.load_state(mid) or {}).get("language") or config_settings().get("language") or "th"
+    if lang == "en":
+        return PROMPTS["en"]
+    th = PROMPTS["th"]
+    if th["SYS"] is None:
+        th.update(SYS=SYS, MAP=MAP_TASK, PERSON=PERSON_TASK, FINAL=FINAL_TASK, DECISION=DECISION_TASK, ACTION=ACTION_TASK, DEC_RE=DECISION_RE, ACT_RE=ACTION_RE)
+    if lang == "th-en":
+        return {**th, "SYS": th["SYS"] + " การประชุมนี้พูดทั้งภาษาไทยและอังกฤษ: คงชื่อ คำศัพท์ และประโยคภาษาอังกฤษไว้ตามที่พูด สรุปเป็นภาษาไทย"}
+    return th
 
 
 DECISION_RE = re.compile(r"(มีมติ|ลงมติ|ที่ประชุม\S{0,6}(?:อนุมัติ|เห็นชอบ|รับทราบ|ตกลง|มีมติ)|อนุมัติ|เห็นชอบ|ไม่เห็นด้วย|งดออกเสียง|คะแนนเสียง|เสียงข้างมาก|ผ่านการอนุมัติ|เป็นอันว่า|ตกลงตามนี้|ตกลงกัน|ตัดสินใจ|สรุปว่า)")
@@ -434,11 +493,12 @@ def _range_of(chunk: str) -> str:
 def summarize(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str], glossary: str, progress=lambda f: None, context: str = "",
               terms: list[str] | None = None, coverage: list[dict] | None = None, agenda: list[dict] | None = None, use_refs: bool = True) -> str:
     part_file, part = _checkpoint(mid)
+    P = prompts(mid)
     lines = [line_of(s, names) for s in segs if s["text"].strip()]
     if not lines:
-        return "## ภาพรวม\nไม่พบเนื้อหาการสนทนาในการบันทึกนี้\n"
+        return P["EMPTY"]
     chunks = split_lines(lines)
-    gl = background(glossary, context, terms, coverage)
+    gl = background(glossary, context, terms, coverage, P)
     detail: list[tuple[str, str]] = []  # (time range, notes of that part): printed as "details by time" for long meetings
     if len(chunks) == 1:
         material = chunks[0] + (references(mid, chunks[0]) if use_refs else "")
@@ -447,9 +507,9 @@ def summarize(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str
         for i, c in enumerate(chunks):
             key = str(i)
             if key not in part["map"]:
-                part["map"][key] = strip_echo(llm.chat(SYS, f"{MAP_TASK}{gl}\n\nบันทึก:\n{c}" + (references(mid, c) if use_refs else ""), MAP_TOKENS))
+                part["map"][key] = strip_echo(llm.chat(P["SYS"], f"{P['MAP']}{gl}\n\n{P['NOTES']}:\n{c}" + (references(mid, c) if use_refs else ""), MAP_TOKENS))
                 store.write_json(part_file, part)
-            notes.append(f"(ส่วนที่ {i + 1}/{len(chunks)})\n{part['map'][key]}")
+            notes.append(f"({P['PART']} {i + 1}/{len(chunks)})\n{part['map'][key]}")
             progress((i + 1) / (len(chunks) + 1) * 0.6)
         detail = [(_range_of(c), part["map"][str(i)]) for i, c in enumerate(chunks)]
         # Notes of a long meeting do not fit one final prompt: condense them in groups, level by level, until they do. (The old code condensed
@@ -470,7 +530,7 @@ def summarize(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str
             for k, g in enumerate(groups):
                 key = f"r{level}-{k}"
                 if key not in part["map"]:
-                    part["map"][key] = llm.chat(SYS, f"{MAP_TASK}{gl}\n\nบันทึกย่อ:\n" + "\n\n".join(g), MAP_TOKENS)
+                    part["map"][key] = llm.chat(P["SYS"], f"{P['MAP']}{gl}\n\n{P['SHORT']}:\n" + "\n\n".join(g), MAP_TOKENS)
                     store.write_json(part_file, part)
                 new.append(part["map"][key])
             notes, level = new, level + 1
@@ -479,24 +539,24 @@ def summarize(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str
             material = material[:9000]
     # decisions and tasks: sentences found by rule, written up by the model (checkpointed); nothing found -> said so, no invention
     found = {}
-    for key, rx, task, none in (("decisions", DECISION_RE, DECISION_TASK, "ไม่พบการระบุมติหรือการตัดสินใจในบันทึก"),
-                                ("actions", ACTION_RE, ACTION_TASK, "ไม่พบการมอบหมายงานในบันทึก")):
+    for key, rx, task, none in (("decisions", P["DEC_RE"], P["DECISION"], P["NONE"][0]), ("actions", P["ACT_RE"], P["ACTION"], P["NONE"][1])):
         ev = evidence(segs, names, rx)
         if not ev:
             found[key] = none
         else:
             if key not in part["notes"]:
-                part["notes"][key] = llm.chat(SYS, f"{task}{gl}\n\nประโยค:\n{ev}", 450)
+                part["notes"][key] = llm.chat(P["SYS"], f"{task}{gl}\n\n{P['SENT']}:\n{ev}", 450)
                 store.write_json(part_file, part)
             found[key] = part["notes"][key]
         progress(0.7 if key == "decisions" else 0.8)
-    final = strip_echo(llm.chat(SYS, f"{FINAL_TASK}{gl}\n\nบันทึก:\n{material}", 1000), terms)
+    final = strip_echo(llm.chat(P["SYS"], f"{P['FINAL']}{gl}\n\n{P['NOTES']}:\n{material}", 1000), terms)
     sec = _sections(final)
-    out = ["## ภาพรวม\n" + sec.get("ภาพรวม", "").strip(), "## ประเด็นสำคัญ\n" + sec.get("ประเด็นสำคัญ", "").strip(),
-           "## มติ / ข้อตัดสินใจ\n" + _drop_template(found["decisions"]), "## งานที่ต้องทำ\n" + _drop_template(found["actions"]),
-           "## ประเด็นค้าง / ต้องติดตาม\n" + (sec.get("ประเด็นค้าง / ต้องติดตาม", "").strip() or "ไม่พบประเด็นค้างที่ระบุไว้ในบันทึก")]
+    H = P["H"]
+    out = [f"## {H[0]}\n" + sec.get(H[0], "").strip(), f"## {H[1]}\n" + sec.get(H[1], "").strip(),
+           f"## {H[2]}\n" + _drop_template(found["decisions"]), f"## {H[3]}\n" + _drop_template(found["actions"]),
+           f"## {H[4]}\n" + (sec.get(H[4], "").strip() or P["NONE"][2])]
     if detail:
-        out.append("## รายละเอียดตามช่วงเวลา\n" + "\n\n".join(f"### [{r}]\n{n.strip()}" for r, n in detail))
+        out.append(f"## {H[5]}\n" + "\n\n".join(f"### [{r}]\n{n.strip()}" for r, n in detail))
     return "\n\n".join(out)
 
 
@@ -507,8 +567,8 @@ def _drop_template(text: str) -> str:
     for ln in text.splitlines():
         if re.match(r"^\s*(เรื่อง\s*[–-]\s*ผลที่ตกลง|ผู้รับผิดชอบ\s*[–-]\s*งาน\s*[–-]\s*กำหนดเวลา)", ln):
             continue
-        ln = re.sub(r"^\s*\**(มติ\s*/\s*ข้อตัดสินใจ|งานที่ต้องทำ|รายการ[^:：*]{0,20})\**\s*[:：][\s*:：]*", "", ln)
-        if ln.strip() and not re.match(r"^\s*(?:[-*•]|\d+[.)])\s", ln) and not ln.startswith(" ") and not re.match(r"^\s*(ไม่พบ|ไม่มี)", ln):  # "nothing found" is a sentence, not an item
+        ln = re.sub(r"^\s*\**(มติ\s*/\s*ข้อตัดสินใจ|งานที่ต้องทำ|รายการ[^:：*]{0,20}|Decisions|Action items)\**\s*[:：][\s*:：]*", "", ln)
+        if ln.strip() and not re.match(r"^\s*(?:[-*•]|\d+[.)])\s", ln) and not ln.startswith(" ") and not re.match(r"^\s*(ไม่พบ|ไม่มี|No |None)", ln):  # "nothing found" is a sentence, not an item
             ln = "- " + ln.strip()
         out.append(ln)
     return "\n".join(out).strip()
@@ -531,9 +591,9 @@ def strip_echo(md: str, terms: list[str] | None = None) -> str:
     """The 4B model sometimes ends with an empty “หมายเหตุ” or repeats the glossary it was given: drop those lines."""
     out = []
     for ln in md.splitlines():
-        if re.match(r"^\s*\*{0,2}(หมายเหตุ|คำศัพท์/ชื่อที่เกี่ยวข้อง)[^\n]*?\*{0,2}\s*:?\s*$", ln) and len(ln.strip(" *:")) < 12:
+        if re.match(r"^\s*\*{0,2}(หมายเหตุ|คำศัพท์/ชื่อที่เกี่ยวข้อง|Notes?|Glossary|Terms)[^\n]*?\*{0,2}\s*:?\s*$", ln) and len(ln.strip(" *:")) < 12:
             continue
-        if not out and re.match(r"^\s*\*{0,2}#{0,3}\s*(สรุป(การ)?ประชุม|Meeting \d{4}-\d\d-\d\d|บันทึกการประชุม)[^\n]{0,60}\*{0,2}\s*$", ln):
+        if not out and re.match(r"^\s*\*{0,2}#{0,3}\s*(สรุป(การ)?ประชุม|Meeting \d{4}-\d\d-\d\d|บันทึกการประชุม|Meeting (summary|notes)|Summary of)[^\n]{0,60}\*{0,2}\s*$", ln, re.I):
             continue  # Gemma opens its notes with a title line ("**สรุปการประชุม Meeting 2026-10-10 09:13**"): not a note
         if terms and sum(1 for t in terms[:12] if t in ln) >= 5:
             continue
@@ -546,20 +606,27 @@ def by_agenda(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str
     for the others the model only sees the transcript lines that belong to that item (the matching sentences and their neighbours)."""
     part_file, part = _checkpoint(mid)
     part.setdefault("agenda", {})
-    gl = background("", "", terms)
-    out = ["## สรุปตามวาระ"]
+    P = prompts(mid)
+    en = P is PROMPTS["en"]
+    gl = background("", "", terms, None, P)
+    out = ["## Summary by agenda item" if en else "## สรุปตามวาระ"]
     for n, c in enumerate(coverage):
         key = str(c["index"])
         if not c["covered"]:
-            out.append(f"{c['index'] + 1}) **{c['title']}**: ไม่พบการพูดถึงในบันทึก")
+            out.append(f"{c['index'] + 1}) **{c['title']}**: " + ("not discussed in the notes" if en else "ไม่พบการพูดถึงในบันทึก"))
             continue
         if key not in part["agenda"]:
             idx = sorted({j + d for j in c["seg_idx"] for d in (-1, 0, 1) if 0 <= j + d < len(segs)})
             text = "\n".join((f"{names.get(segs[j].get('spk'), '')}: " if names and segs[j].get("spk") else "") + segs[j]["text"] for j in idx)[:2400]
-            ans = llm.chat(SYS, f"บันทึกการประชุม:\n{text}\n\nคำถาม: ในวาระ “{c['title']}” ที่ประชุมพูดคุยอะไร และมีมติหรืองานที่ต้องทำอะไรบ้าง? ตอบเป็นประโยคสั้นๆ 1-3 ประโยคด้วยคำของคุณเอง "
-                           f"เฉพาะเรื่องของวาระนี้เท่านั้น ห้ามคัดลอกบันทึก ถ้าไม่มีมติให้บอกว่าเป็นการหารือ{gl}", 170, prefill="ในวาระนี้")
-            ans = ("ในวาระนี้" + ans) if ans else ""
-            part["agenda"][key] = " ".join((ans or "สรุปไม่สำเร็จ").split())
+            if en:
+                ans = llm.chat(P["SYS"], f"Meeting notes:\n{text}\n\nQuestion: under the agenda item “{c['title']}”, what was discussed, and what was decided or assigned? "
+                               f"Answer in 1-3 short sentences in your own words, about this item only, without copying the notes; if nothing was decided, say it was a discussion.{gl}", 170, prefill="Under this item")
+                ans = ("Under this item" + ans) if ans else ""
+            else:
+                ans = llm.chat(P["SYS"], f"บันทึกการประชุม:\n{text}\n\nคำถาม: ในวาระ “{c['title']}” ที่ประชุมพูดคุยอะไร และมีมติหรืองานที่ต้องทำอะไรบ้าง? ตอบเป็นประโยคสั้นๆ 1-3 ประโยคด้วยคำของคุณเอง "
+                               f"เฉพาะเรื่องของวาระนี้เท่านั้น ห้ามคัดลอกบันทึก ถ้าไม่มีมติให้บอกว่าเป็นการหารือ{gl}", 170, prefill="ในวาระนี้")
+                ans = ("ในวาระนี้" + ans) if ans else ""
+            part["agenda"][key] = " ".join((ans or ("summary failed" if en else "สรุปไม่สำเร็จ")).split())
             store.write_json(part_file, part)
         out.append(f"{c['index'] + 1}) **{c['title']}**: {part['agenda'][key]}")
         progress((n + 1) / max(1, len(coverage)))
@@ -577,7 +644,8 @@ def person_lines(segs: list[dict], names: dict[str, str]) -> dict[str, list[str]
 def narratives(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str], rep: dict, glossary: str, progress=lambda f: None, context: str = "") -> dict:
     """Per-person contribution notes (checkpointed). The participation overview is computed from the statistics, not by the LLM."""
     part_file, part = _checkpoint(mid)
-    gl = background(glossary, context)
+    P = prompts(mid)
+    gl = background(glossary, context, None, None, P)
     people = {}
     mine = person_lines(segs, names)
     for i, (name, lines) in enumerate(sorted(mine.items(), key=lambda kv: -len(kv[1]))):
@@ -585,7 +653,7 @@ def narratives(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, st
             if sum(len(x) + 1 for x in lines) > 2800:  # sample evenly across the meeting
                 step = max(2, int(sum(len(x) for x in lines) / 2800) + 1)
                 lines = lines[::step]
-            part["notes"][name] = llm.chat(SYS, PERSON_TASK.format(name=name) + f"{gl}\n\nบันทึก:\n" + "\n".join(lines)[:3200], 350)
+            part["notes"][name] = llm.chat(P["SYS"], P["PERSON"].format(name=name) + f"{gl}\n\n{P['NOTES']}:\n" + "\n".join(lines)[:3200], 350)
             store.write_json(part_file, part)
         people[name] = part["notes"][name]
         progress(0.7 + 0.25 * (i + 1) / max(1, len(mine)))

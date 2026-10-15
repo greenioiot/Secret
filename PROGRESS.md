@@ -684,3 +684,32 @@ and transcribed with correction by human afterward".
   models/whisper-en/: on a synthesized English sentence it was word-perfect in 8 s (language=en), the Thonburian Thai Whisper looped on "ทุกคน",
   Typhoon Whisper Large v3 got half of it. Qualcomm AI Hub's Gemma-4-E4B-it (GenieX qairt bundle, w4a16, QNN 2.45+, this box has 2.46) is a
   possible NPU path later: much faster prompt reading, ~8 tok/s writing, but needs the GenieX Linux install and an adapter (no HTTP server on Linux).
+
+## Round 54 (2026-10-15): the meeting's language — Thai · Thai + English · English — through captions, transcript and summary
+- Why: every installed speech model is Thai-tuned. Measured (PERFORMANCE.md §3b): on a 10-s English sentence the Thonburian Whisper loops
+  ("ทุกคน ทุกคน…"), Typhoon Whisper Large v3 gets half of it, Whisper large-v3-turbo told "English" is word-perfect in 8 s. FastConformer and the
+  vote have no English at all, so a Thai-only choice cannot transcribe a Thai + English meeting well either.
+- New per-meeting language (state "language": th | th-en | en). Pressing Start asks it under the live-captions / record-only cards ("Language spoken
+  in this meeting · ภาษาที่ใช้ในการประชุม", three buttons, a line under them saying which live and after-meeting models that language gets, from
+  GET /api/engines "language_plans"). The default is a new setting (Settings → Processing: "Meeting language", validated), a planned meeting carries
+  its own (POST /api/meetings/plan "language", PATCH "language" on any meeting: a planned one uses it at Start, a recorded one when it is transcribed
+  or summarized again; a meeting's page has the select). /ws/record?lang= sets it; a continued meeting keeps its language.
+- Engines by language (worker.pick_engine / engines.after_plan agree): th = unchanged. th-en = the accuracy choice if it is a Whisper model, else
+  Typhoon Whisper Large v3 (installed) or the Thonburian Whisper, logged in the meeting's history ("… has no English, Typhoon Whisper Large v3 is used
+  instead"). en = Whisper large-v3-turbo (models/whisper-en/large-v3-turbo-ct2, deepdml CTranslate2, 1.6 GB, language fixed to English, kind "wen");
+  no Typhoon realtime pass for its chunks (it would only write Thai) and the live accurate lane skips English meetings. asr.WhisperTH takes language=.
+- Live captions of an English meeting: asr.WhisperLive = Whisper small.en (models/whisper-en/small.en-ct2, Systran) on 4 CPU threads with the
+  ThaiCTC interface; server.live_engine(lang) picks it for captions, the preflight, the host's sound check and the guests' phones; no interim
+  (partial) text for English (Whisper pads to 30 s; about 1 s per sentence after it ends). The engines strip shows "Language: …".
+- Summary in the meeting's language: summarize.PROMPTS["en"] (system, map, final, decision, action, per-person prompts; English headings Overview /
+  Key points / Decisions / Action items / Open items / Details by time / Summary by agenda item; English decision + action sentence finders;
+  English "nothing found" lines, background labels); th-en = the Thai prompts plus "both languages are spoken: keep the English as said, summarize
+  in Thai". worker.summary_counts counts the English headings too; _drop_template / strip_echo know the English labels.
+- Test tools/tests/test_language.py on the scratch instance with english.wav / mixed.wav / thai.wav (clips made for this round: Piper en_US-lessac
+  for the English sentence, 6 s of the shareholder meeting for Thai): settings default + validation, /api/engines plans per language, plan + patch,
+  then three real meetings over /ws/record: English live (language en on "started", English live model, English captions, transcript by
+  whisper-large-v3-turbo-en "…third quarter budget. Revenue reached $2.4 million, up 12%. Sarah will send the updated forecast by Friday.", Gemma
+  summary in English with "Sarah – send the updated forecast – Friday"), Thai + English record-only (switch to Large v3 logged; transcript has the
+  Thai sentence and the English one), Thai record-only (FastConformer, Thai). Headless Chrome: the Start dialog shows the three buttons with the
+  default highlighted, choosing "English only" updates the model line, Cancel closes; Settings has the select; no page errors. test_language.py 24/24;
+  the Round 52 dialog test re-run (below).

@@ -204,9 +204,10 @@ class ThaiCTC:
 class WhisperTH:
     """Thonburian distil-Whisper medium through faster-whisper (int8, CPU)."""
 
-    def __init__(self, threads: int = 4, model_dir=config.WHISPER_TH):
+    def __init__(self, threads: int = 4, model_dir=config.WHISPER_TH, language: str = "th"):
         from faster_whisper import WhisperModel
 
+        self.language = language  # "th" for the Thai-tuned models (they keep English words); "en" for the English model of English-only meetings
         self.model = WhisperModel(str(model_dir), device="cpu", compute_type="int8", cpu_threads=threads, num_workers=1)
 
     def transcribe(self, pcm16: np.ndarray, prompt: str = "") -> tuple[str, float, float]:
@@ -215,7 +216,7 @@ class WhisperTH:
         segs, _ = self.model.transcribe(
             # beam 2, one pass: measured on 51 s of Thai speech (4 cores) beam 5 + temperature fallback = 3.4 % CER in 145 s,
             # beam 2 = 3.4 % in 57 s, beam 1 = 4.2 % in 37 s. Loops / low confidence are caught afterwards by choose() (falls back to Typhoon).
-            audio, language="th", task="transcribe", beam_size=2, temperature=0.0,
+            audio, language=self.language, task="transcribe", beam_size=2, temperature=0.0,
             compression_ratio_threshold=2.2, log_prob_threshold=-1.0, no_speech_threshold=0.6,
             # NO initial_prompt, on purpose: measured on Thai speech, any prompt (even two names) wrecks this distilled Thai Whisper
             # (error rate 3.4% without, 43% with names only, 49-94% with longer prompts). Names/terms are applied AFTER recognition instead.
@@ -252,7 +253,7 @@ def _whisper_transcribe_many(self, pcms, batch_size: int = 8) -> list[tuple[str,
     if parts:
         segs, _ = self._batched.transcribe(
             np.concatenate(parts), clip_timestamps=[{"start": c["start"], "end": c["end"]} for c in clips], batch_size=batch_size,
-            language="th", task="transcribe", beam_size=2, temperature=0.0, condition_on_previous_text=False, vad_filter=False,
+            language=self.language, task="transcribe", beam_size=2, temperature=0.0, condition_on_previous_text=False, vad_filter=False,
             without_timestamps=True)
         texts: dict[int, list] = {}
         for sg in segs:
@@ -322,6 +323,24 @@ def fill_gaps(pcm16: np.ndarray, chunks, max_s: float = 24.0, margin_s: float = 
             out.append([a * 320, b * 320])
         i = max(j, i + 1)
     return out
+
+
+class WhisperLive:
+    """Whisper as the LIVE caption engine of an English-only meeting (small.en by default: a 30 s window costs ~1 s on 4 cores), with the
+    interface of ThaiCTC (transcribe_long / transcribe -> (text, confidence)), so server.caption() can use either."""
+
+    kind, backend = "whisper-en", "cpu"
+
+    def __init__(self, threads: int = 4, model_dir=config.WHISPER_EN_LIVE, language: str = "en"):
+        self.w = WhisperTH(threads=threads, model_dir=model_dir, language=language)
+
+    def transcribe_long(self, pcm16: np.ndarray, max_s: float = 30.0) -> tuple[str, float]:
+        text, lp, ns = self.w.transcribe(pcm16[: int(max_s * config.SR)])
+        if not text or ns > 0.8 or repetition_ratio(text) > 2.4:
+            return "", 0.0
+        return text, float(np.exp(lp))
+
+    transcribe = transcribe_long
 
 
 def choose(whisper: tuple[str, float, float] | None, typhoon: tuple[str, float]) -> tuple[str, str, float]:

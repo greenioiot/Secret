@@ -141,6 +141,9 @@ def engines(accurate: bool, kind: str = "whisper"):
             _, path, _, ram, name = CT2_KINDS[kind]
             wait_for_ram(ram, "loading " + name)
             _whisper = asr.WhisperTH(threads=config.CORES, model_dir=path)
+        elif kind == "wen":
+            wait_for_ram(2.5, "loading the English Whisper (large-v3-turbo)")
+            _whisper = asr.WhisperTH(threads=config.CORES, model_dir=config.WHISPER_EN, language="en")
         elif kind == "rnnt":
             import rnnt
 
@@ -348,8 +351,23 @@ def transcribe_stats(mid, cfg, mode, kind, segs, chunks, done, work, live_done, 
 
 
 def pick_engine(mid: str, cfg: dict) -> tuple[str, bool, str]:
-    """(accuracy mode, accurate?, engine kind) as set in Settings; a model that is not installed falls back (noted in the meeting's log)."""
+    """(accuracy mode, accurate?, engine kind) as set in Settings; a model that is not installed falls back (noted in the meeting's log).
+    The meeting's language (state "language", else the setting) comes first: English-only meetings use the English Whisper (the Thai models
+    loop or write Thai for English speech); Thai + English meetings need a Whisper model (FastConformer / the vote / the CTC heads have no
+    English), so a Thai-only choice becomes Typhoon Whisper Large v3 when installed, else the Thonburian Whisper."""
     mode = cfg["accuracy"]
+    lang = meeting_language(mid, cfg)
+    if lang == "en":
+        if (config.WHISPER_EN / "model.bin").exists():
+            return "english", True, "wen"
+        store.log_event(mid, "English meeting, but the English Whisper model is not installed (models/whisper-en): the Thai models are used")
+    elif lang == "th-en" and (mode in ("fast", "npu", "pathumma-rnnt", "vote3", "best") or mode not in ("accurate", *config.WHISPER_CT2)):
+        if (config.WHISPER_LV3 / "model.bin").exists():
+            store.log_event(mid, f"Thai + English meeting: {engines_names().get(mode, mode)} has no English, Typhoon Whisper Large v3 is used instead")
+            mode = "large"
+        else:
+            store.log_event(mid, f"Thai + English meeting: {engines_names().get(mode, mode)} has no English, the Thonburian Whisper is used instead")
+            mode = "accurate"
     accurate = mode in ("accurate", "best", "npu", "pathumma-rnnt", "vote3", *config.WHISPER_CT2)
     kind = "whisper"
     if mode == "vote3":
@@ -387,6 +405,18 @@ def pick_engine(mid: str, cfg: dict) -> tuple[str, bool, str]:
         else:
             store.log_event(mid, "best accuracy needs the Qwen environment (.venv-qwen): using Whisper instead")
     return mode, accurate, kind
+
+
+def meeting_language(mid: str, cfg: dict) -> str:
+    st = store.load_state(mid) or {}
+    lang = st.get("language") or cfg.get("language") or "th"
+    return lang if lang in config.LANGUAGES else "th"
+
+
+def engines_names() -> dict:
+    import engines
+
+    return engines.ACCURACY
 
 
 def do_transcribe(mid: str):
@@ -490,8 +520,8 @@ def do_transcribe(mid: str):
                 tick()
                 continue
             t_chunk = time.time()
-            tt, tc = ctc.transcribe_long(audio[a:b])
-            if len(ch) > 3 and ch[3] is True and (len(tt.strip()) < 6 or tc < 0.6):  # a stretch the VAD skipped: keep it only if the fast pass really heard words
+            tt, tc = ("", 0.0) if kind == "wen" else ctc.transcribe_long(audio[a:b])  # (the Thai realtime pass would only write Thai for English speech)
+            if kind != "wen" and len(ch) > 3 and ch[3] is True and (len(tt.strip()) < 6 or tc < 0.6):  # a stretch the VAD skipped: keep it only if the fast pass really heard words
                 save({"i": i, "t0": round(a / config.SR, 2), "t1": round(b / config.SR, 2), "text": "", "src": "silence", "spk": who, "conf": 0.0, "typhoon": tt, "whisper": None})
                 done[i] = {"text": "", "src": "silence", "conf": 0.0, "t0": round(a / config.SR, 2), "t1": round(b / config.SR, 2), "spk": who}
                 work["n"] += 1
@@ -517,7 +547,7 @@ def do_transcribe(mid: str):
     fixes = []
     if cfg["apply_term_corrections"] and cfg["use_materials"] and segs:
         fixes = learn.correct_segments(segs, learn.correction_terms(mid) + glossary_terms)  # near-miss spellings of known terms; originals stay in seg["orig"]
-    store.write_json(d / "transcript.json", {"engine": ("vote3: pathumma-whisper-large + pathumma-whisper-medium + fastconformer" if kind == "vote" else "typhoon-asr-qwen-1.7b-ctx+typhoon" if kind == "qwen" else "pathumma-stt-fastconformer-rnnt+typhoon" if kind == "rnnt" else CT2_KINDS[kind][2] + "+typhoon" if kind in CT2_KINDS else "typhoon-whisper-medium-ctc+typhoon" if kind == "wctc" else "whisper-th+typhoon") if accurate else "typhoon",
+    store.write_json(d / "transcript.json", {"engine": ("whisper-large-v3-turbo-en" if kind == "wen" else "vote3: pathumma-whisper-large + pathumma-whisper-medium + fastconformer" if kind == "vote" else "typhoon-asr-qwen-1.7b-ctx+typhoon" if kind == "qwen" else "pathumma-stt-fastconformer-rnnt+typhoon" if kind == "rnnt" else CT2_KINDS[kind][2] + "+typhoon" if kind in CT2_KINDS else "typhoon-whisper-medium-ctc+typhoon" if kind == "wctc" else "whisper-th+typhoon") if accurate else "typhoon",
                                              "created": time.strftime("%F %T"), "segments": segs, "term_corrections": fixes})
     store.atomic_write(d / "transcript.md", store.transcript_md(store.load_state(mid), segs, store.speaker_names(mid)))
     if segs and (d / "speakers.json").exists() and not cfg.get("speakers_after"):  # voices known already: split overlapping speech now
@@ -885,7 +915,7 @@ def summary_counts(md: str) -> tuple[int, int]:
             return 0
         return sum(1 for ln in m.group(1).splitlines() if re.match(r"^\s*(?:\d+[.)]|[-*•])\s+\S", ln))
 
-    return items("มติ"), items("งานที่ต้องทำ")
+    return items("มติ") or items("Decisions"), items("งานที่ต้องทำ") or items("Action items")
 
 
 def recover():
@@ -982,7 +1012,7 @@ def live_lane():
         worked = False
         if cfg["live_accurate"] and cfg["accuracy"] == "accurate" and recording_active():
             for st in store.list_meetings():
-                if st["status"] != "recording":
+                if st["status"] != "recording" or st.get("language") == "en":  # (the live lane's Whisper is the Thai one: an English meeting is done after it ends)
                     continue
                 try:
                     if whisper is None:

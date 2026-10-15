@@ -91,6 +91,26 @@ def ctc() -> asr.ThaiCTC:
         return _ctc
 
 
+_live_en = None
+_live_en_lock = threading.Lock()
+
+
+def live_en():
+    """The live-caption engine of an English-only meeting: Whisper small.en on the CPU (asr.WhisperLive, same interface as ctc())."""
+    global _live_en
+    with _live_en_lock:
+        if _live_en is None:
+            _live_en = asr.WhisperLive(threads=4)
+        return _live_en
+
+
+def live_engine(lang: str):
+    """ctc() for Thai / Thai + English meetings, the English Whisper for English-only ones (falls back to ctc() when it is not installed)."""
+    if lang == "en" and (config.WHISPER_EN_LIVE / "model.bin").exists():
+        return live_en()
+    return ctc()
+
+
 PARTIAL_GAP = {"wctc": 2.0, "pathumma-rnnt": 3.0}  # seconds between interim texts (Pathumma runs on the CPU: about 1 s per call)
 SILENT_WARN_S = int(os.environ.get("SECRET_SILENT_S", "60"))  # recording: no sound for this long -> the recorder is warned (muted / unplugged microphone)
 SOUND_DB = -50.0  # a 20 ms packet whose peak is above this counts as sound (room noise through an open microphone is around -45; a muted one -90 or less)
@@ -613,6 +633,7 @@ async def ws_record(ws: WebSocket):
     q = ws.query_params
     cfg = store.settings()
     mode = q.get("mode") if q.get("mode") in ("live", "after") else cfg["mode"]
+    lang = q.get("lang") if q.get("lang") in config.LANGUAGES else (cfg.get("language") if cfg.get("language") in config.LANGUAGES else "th")
     if store.free_gb() < 1.5:
         await ws.send_json({"type": "error", "message": f"Only {store.free_gb():.1f} GB of disk left, free some space first."})
         await ws.close()
@@ -648,6 +669,7 @@ async def ws_record(ws: WebSocket):
                 f.truncate(pcm.stat().st_size - 1)
         store.update_state(mid, status="recording")
         store.log_event(mid, "recording continued")
+        lang = st.get("language") or lang  # a continued meeting keeps its language
     elif q.get("plan"):
         try:
             st = store.load_state(q["plan"])
@@ -665,20 +687,26 @@ async def ws_record(ws: WebSocket):
         upd = {"status": "recording", "mode": mode, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "started_from_plan": True}
         if q.get("title", "").strip():
             upd["title"] = q["title"].strip()[:120]
+        if not q.get("lang") and st.get("language") in config.LANGUAGES:
+            lang = st["language"]  # the plan's language unless the host chose one at Start
+        upd["language"] = lang
         st = store.update_state(mid, **upd)
         store.log_event(mid, "recording started from the plan")
     else:
         st = store.new_meeting(q.get("title", "").strip()[:120], mode, owner=me["user"])
+        st = store.update_state(st["id"], language=lang)
         if q.get("participants"):
             store.update_state(st["id"], participants=store.clean_participants(q["participants"].split("|")))
         mid = st["id"]
     if q.get("packs") is not None and not q.get("resume") and not q.get("plan"):
         st = store.update_state(mid, vocab_packs=[x for x in q["packs"].split("|") if x])  # the packs chosen on the Record tab
-    cfg = {**cfg, "vocab_rules": vocab.rules(vocab.active_ids(st))}  # Thai spellings -> terms of the meeting's vocabulary packs (live captions)
+    cfg = {**cfg, "language": lang, "vocab_rules": vocab.rules(vocab.active_ids(st))}  # Thai spellings -> terms of the meeting's vocabulary packs (live captions)
+    if lang == "en" and mode == "live" and not (config.WHISPER_EN_LIVE / "model.bin").exists():
+        store.log_event(mid, "English meeting: the English live model is not installed, captions come from the Thai model")
     base = store.pcm_seconds(mid)
     active[mid] = {"started": time.time(), "ws": ws, "terminate": False, "cancel": False, "cap": {"lat": [], "captions": 0, "partials": 0},
                    "mode": mode, "cfg": cfg, "ring": mics.Ring(), "merge": mics.LiveMerge(), "tracks": {}, "ncap": itertools.count(1)}
-    stats.record(mid, "recording", started_at=time.strftime("%F %T"), started_ts=round(time.time(), 1), live_engine=cfg.get("live_engine", "typhoon"), accuracy=cfg["accuracy"],
+    stats.record(mid, "recording", started_at=time.strftime("%F %T"), started_ts=round(time.time(), 1), live_engine="whisper-en" if lang == "en" else cfg.get("live_engine", "typhoon"), accuracy=cfg["accuracy"], language=lang,
                  live_partial=bool(cfg["live_partial"]), live_speakers=bool(cfg["live_speakers"]), mode=mode, vocab_packs=vocab.active_ids(st))
     seg = LiveSegmenter(cfg["silence_ms"])
     live_spk = speakers.LiveSpeakers(emb(), cfg["speaker_threshold"], cfg["voice_match_threshold"]) if (
@@ -701,7 +729,7 @@ async def ws_record(ws: WebSocket):
 
     async def caption(start, audio, why="pause", t_ready=None):
         try:
-            text, conf = await loop.run_in_executor(CAPTION_POOL, ctc().transcribe_long, audio)
+            text, conf = await loop.run_in_executor(CAPTION_POOL, live_engine(lang).transcribe_long, audio)
         except Exception as e:  # noqa: BLE001
             await send({"type": "error", "message": f"live captions failed: {e}"})
             return
@@ -743,6 +771,9 @@ async def ws_record(ws: WebSocket):
     last_partial, partial_busy = [0.0], [False]
 
     async def partial(utt, start, audio):
+        if lang == "en":  # Whisper is too slow for interim text: English sentences are captioned when they end
+            partial_busy[0] = False
+            return
         try:
             text, _ = await loop.run_in_executor(PARTIAL_POOL, ctc().transcribe, audio[-int(14.5 * config.SR):])
             text = asr.polish(text, cfg)
@@ -782,7 +813,7 @@ async def ws_record(ws: WebSocket):
     eng = None
     if mode == "live":
         try:
-            eng = await loop.run_in_executor(CAPTION_POOL, ctc)  # load now: the Record tab shows the model really in use
+            eng = await loop.run_in_executor(CAPTION_POOL, live_engine, lang)  # load now: the Record tab shows the model really in use
         except Exception as e:  # noqa: BLE001
             log.warning("live caption model: %s", e)
     await send({"type": "started", "id": mid, "mode": mode, "base": base, "title": st["title"], "engines": engines.plan(cfg, eng)})
@@ -966,14 +997,18 @@ def api_engines():
     others = [m for m in store.list_meetings() if m.get("status") == "recording"]
     busy = (f"“{jobs[0].get('title') or jobs[0]['id']}” is being processed now ({jobs[0]['status']})" if jobs
             else f"“{others[0].get('title') or others[0]['id']}” is being recorded now" if others else "")
-    return {**p, "default": cfg["mode"], "busy": busy, "recommend": "after" if busy else None}
+    return {**p, "default": cfg["mode"], "busy": busy, "recommend": "after" if busy else None,
+            "languages": engines.LANGUAGE, "language_default": engines.language_of(cfg),
+            "language_plans": {k: {"live": engines.live_plan({**cfg, "language": k}), "after": engines.after_plan({**cfg, "language": k})} for k in config.LANGUAGES}}
 
 
 @app.get("/api/preflight")
-async def api_preflight(mode: str = "live"):
+async def api_preflight(mode: str = "live", lang: str = ""):
     """Checked before a meeting starts (Record tab): every part the meeting needs, each {id, label, status ok|warn|fail|info, detail}.
     The live caption model is really loaded and given a second of audio, so a broken model shows up now and not mid-meeting."""
     cfg = store.settings()
+    if lang in config.LANGUAGES:
+        cfg = {**cfg, "language": lang}
     mode = mode if mode in ("live", "after") else cfg["mode"]
     checks = []
 
@@ -1005,7 +1040,7 @@ async def api_preflight(mode: str = "live"):
     if mode == "live":
         try:
             t_load = time.time()
-            eng = await loop.run_in_executor(CAPTION_POOL, ctc)
+            eng = await loop.run_in_executor(CAPTION_POOL, live_engine, engines.language_of(cfg))
             load_s = time.time() - t_load
             t0 = time.time()
             noise = (np.random.default_rng(0).standard_normal(config.SR) * 30).astype(np.int16)  # one second of quiet noise
@@ -1085,7 +1120,7 @@ async def sound_report(pcm: np.ndarray, cfg: dict, mode: str, phone: bool = Fals
     if st["speech_s"] >= 0.5:
         loop = asyncio.get_running_loop()
         try:
-            eng = await loop.run_in_executor(CAPTION_POOL, ctc)
+            eng = await loop.run_in_executor(CAPTION_POOL, live_engine, engines.language_of(cfg))
             t0 = time.time()
             text, _ = await loop.run_in_executor(CAPTION_POOL, eng.transcribe_long, pcm)
             ms = int((time.time() - t0) * 1000)
@@ -1194,6 +1229,10 @@ async def api_patch(mid: str, request: Request):
         upd["title"] = body["title"].strip()[:120]
     if isinstance(body.get("remark"), str):
         upd["remark"] = body["remark"].strip()[:4000]
+    if "language" in body:
+        if body["language"] not in config.LANGUAGES:
+            raise HTTPException(400, "language must be th, th-en or en")
+        upd["language"] = body["language"]  # (changes what a planned meeting will use, or how a recorded one is re-transcribed / re-summarized)
     if "participants" in body:
         if not isinstance(body["participants"], list):
             raise HTTPException(400, "participants must be a list of names")
@@ -1229,7 +1268,8 @@ async def api_plan(request: Request):
         raise HTTPException(400, "planned_at must look like 2026-10-06T14:30")
     st = store.new_meeting(str(body.get("title") or "New meeting").strip()[:120] or "New meeting", "live", owner=who(request)["user"])
     store.update_state(st["id"], status="planned", planned_at=pa, participants=store.clean_participants(body.get("participants") or []), remark=str(body.get("remark") or "").strip()[:4000],
-                       agenda=botmod.resolve({"agenda": body.get("agenda") or []})["agenda"])
+                       agenda=botmod.resolve({"agenda": body.get("agenda") or []})["agenda"],
+                       language=body.get("language") if body.get("language") in config.LANGUAGES else store.settings().get("language", "th"))
     store.log_event(st["id"], "meeting planned")
     return store.load_state(st["id"])
 
@@ -2564,7 +2604,7 @@ async def guest_caption(mid: str, name: str, phone: dict, t0: float, audio):
         return  # someone else near this phone: the room microphone captions them
     loop = asyncio.get_running_loop()
     try:
-        text, conf = await loop.run_in_executor(CAPTION_POOL, ctc().transcribe_long, audio)
+        text, conf = await loop.run_in_executor(CAPTION_POOL, live_engine(a["cfg"].get("language", "th")).transcribe_long, audio)
     except Exception:  # noqa: BLE001 - the room captions go on
         return
     text = asr.polish(text, a["cfg"])

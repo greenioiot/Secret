@@ -61,6 +61,8 @@ def save_settings(new: dict) -> dict:
     cur["guide_wifi"] = " ".join(str(cur["guide_wifi"]).split())[:200]
     if cur["guide_lang"] not in ("auto", "th", "en"):
         cur["guide_lang"] = "auto"
+    if cur.get("language") not in config.LANGUAGES:
+        cur["language"] = config.DEFAULT_SETTINGS["language"]
     cur["handsfree_wake"] = re.sub(r"[^\w\u0e00-\u0e7f -]", "", str(cur["handsfree_wake"])).strip()[:20] or config.DEFAULT_SETTINGS["handsfree_wake"]
     cur["enroll_text"] = " ".join(str(cur["enroll_text"]).split())[:config.ENROLL_TEXT_MAX]
     if cur["enroll_text"] == config.ENROLL_TEXT:

@@ -35,7 +35,15 @@ SUMMARY_MEASURED = {
     "typhoon-30b": {"ram_gb": 18.6, "where": "CPU", "note": "Best in the side-by-side test: correct numbers, names and places; nothing invented."},
     "gemma4-e4b": {"ram_gb": 7.8, "where": "CPU", "note": "Google's Gemma 4 (2026): correct numbers and names in the side-by-side test, nothing invented; reads 50 and writes 11 tokens/s on the CPU (the NPU hangs with it)."},
 }
-LIVE = {"typhoon": "Typhoon realtime CTC", "wctc": "Whisper-medium CTC", "pathumma-rnnt": "Pathumma FastConformer (NECTEC)"}
+LIVE = {"typhoon": "Typhoon realtime CTC", "wctc": "Whisper-medium CTC", "pathumma-rnnt": "Pathumma FastConformer (NECTEC)", "whisper-en": "Whisper small.en (English)"}
+LANGUAGE = {"th": "Thai · ไทย", "th-en": "Thai + English · ไทยปนอังกฤษ", "en": "English only"}
+ENGLISH_AFTER = "Whisper Large v3 Turbo (English)"
+THAI_ONLY = ("fast", "npu", "pathumma-rnnt", "vote3", "best")  # accuracy modes whose models have no English (FastConformer, the CTC heads, the vote, the Qwen ASR)
+
+
+def language_of(cfg: dict) -> str:
+    lang = cfg.get("language") or "th"
+    return lang if lang in config.LANGUAGES else "th"
 
 
 def live_name(engine) -> str:
@@ -53,6 +61,16 @@ def after_plan(cfg: dict) -> dict:
     name = ACCURACY.get(mode, mode)
     ok, note = True, ""
     default_ok = (config.WHISPER_TH / "model.bin").exists()
+    lang = language_of(cfg)
+    if lang == "en":  # the worker's pick_engine does the same
+        ok = (config.WHISPER_EN / "model.bin").exists()
+        return {"mode": "english", "name": ENGLISH_AFTER, "uses": ENGLISH_AFTER if ok else (DEFAULT_WHISPER if default_ok else "Typhoon realtime CTC only"), "ok": ok,
+                "note": "" if ok else "the English Whisper model is not installed (models/whisper-en): the Thai models would be used"}
+    if lang == "th-en" and (mode in THAI_ONLY or mode not in ("accurate", *config.WHISPER_CT2)):
+        lv3 = (config.WHISPER_LV3 / "model.bin").exists()
+        mode = "large" if lv3 else "accurate"
+        note = f"Thai + English: {name} has no English, so {ACCURACY[mode]} is used"
+        name = ACCURACY[mode]
     if mode in config.WHISPER_CT2:
         ok = (config.WHISPER_CT2[mode][1] / "model.bin").exists()
     elif mode == "pathumma-rnnt":
@@ -84,6 +102,29 @@ def after_plan(cfg: dict) -> dict:
     return {"mode": mode, "name": name, "uses": uses, "ok": ok, "note": note}
 
 
+def live_plan(cfg: dict, live_engine=None) -> dict:
+    """The live-caption model for this language: English-only meetings caption with Whisper small.en on the CPU (sentence by sentence)."""
+    if language_of(cfg) == "en":
+        ok = (config.WHISPER_EN_LIVE / "model.bin").exists()
+        live = {"name": LIVE["whisper-en"] + " · CPU", "wanted": LIVE["whisper-en"]}
+        if not ok:
+            live["note"] = "the English live model is not installed (models/whisper-en/small.en-ct2): no live captions for English"
+        elif live_engine is not None and getattr(live_engine, "kind", "") != "whisper-en":
+            live["note"] = "captions come from the Thai model until the English one has loaded"
+        else:
+            live["note"] = "each sentence is captioned after it ends (about a second later)"
+        return live
+    want = cfg.get("live_engine", "typhoon") if cfg.get("live_engine") in LIVE else "typhoon"
+    want_live = LIVE[want]
+    live = {"name": live_name(live_engine) if live_engine is not None else want_live, "wanted": want_live}
+    if live_engine is not None:
+        if getattr(live_engine, "kind", "typhoon") != want:
+            live["note"] = f"{want_live} could not load: the Typhoon realtime model is used"
+        elif want == "typhoon" and cfg.get("asr_npu", True) and getattr(live_engine, "backend", "cpu") != "npu":
+            live["note"] = "the NPU is not available: captions run on the CPU (slower)" + (f" ({live_engine.npu_error[:80]})" if getattr(live_engine, "npu_error", "") else "")
+    return live
+
+
 def summary_plan(cfg: dict) -> dict:
     choice = cfg.get("summary_model", "typhoon-4b")
     choice = choice if choice in config.SUMMARY_GGUF else "typhoon-4b"  # a removed model (Chinda, OpenThaiGPT, Pathumma) -> the summary falls back to the 4B
@@ -100,13 +141,5 @@ def summary_plan(cfg: dict) -> dict:
 
 
 def plan(cfg: dict, live_engine=None) -> dict:
-    want = cfg.get("live_engine", "typhoon") if cfg.get("live_engine") in LIVE else "typhoon"
-    want_live = LIVE[want]
-    live = {"name": live_name(live_engine) if live_engine is not None else want_live, "wanted": want_live}
-    if live_engine is not None:
-        if getattr(live_engine, "kind", "typhoon") != want:
-            live["note"] = f"{want_live} could not load: the Typhoon realtime model is used"
-        elif want == "typhoon" and cfg.get("asr_npu", True) and getattr(live_engine, "backend", "cpu") != "npu":
-            live["note"] = "the NPU is not available: captions run on the CPU (slower)" + (f" ({live_engine.npu_error[:80]})" if getattr(live_engine, "npu_error", "") else "")
-    return {"live": live, "after": after_plan(cfg), "summary": summary_plan(cfg),
+    return {"live": live_plan(cfg, live_engine), "after": after_plan(cfg), "summary": summary_plan(cfg), "language": language_of(cfg),
             "speakers": bool(cfg.get("live_speakers")), "identify_speakers": bool(cfg.get("identify_speakers"))}

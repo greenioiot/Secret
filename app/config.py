@@ -21,6 +21,9 @@ WHISPER_CT2 = {
 PATHUMMA_RNNT = PATHUMMA / "stt-fastconformer-rnnt/pathumma-stt-th-fastconformer-rnnt-large.nemo"  # NeMo FastConformer-RNNT (CC-BY-4.0): accuracy mode 'pathumma-rnnt'
 NEMO_PY = Path(os.environ.get("SECRET_NEMO_PY", "/mnt/genie/projectAI/export/venv-nemo/bin/python"))  # a venv with nemo_toolkit[asr] + torch (CPU)
 WHISPER_TH = PROJECT_AI / "models/whisper-th/distill-whisper-th-medium"  # Thonburian, CTranslate2 (accurate pass)
+WHISPER_EN = ROOT / "models/whisper-en/large-v3-turbo-ct2"  # OpenAI Whisper large-v3-turbo, CTranslate2 (deepdml): English-only meetings, after the meeting
+WHISPER_EN_LIVE = ROOT / "models/whisper-en/small.en-ct2"  # Whisper small.en (Systran): live captions of English-only meetings (the big model pads every sentence to 30 s)
+LANGUAGES = ("th", "th-en", "en")  # meeting language: Thai | Thai with English words / sentences | English only (per meeting; the default is a setting)
 LLAMA_BUILD = PROJECT_AI / "vlm/llama.cpp-snapdragon"                    # llama-server + libs (run on CPU only)
 LLM_GGUF = PROJECT_AI / "models/typhoon2.5-qwen3-4b/typhoon2.5-qwen3-4b-q4_0.gguf"
 LLM_GGUF_30B = ROOT / "models/typhoon-30b/typhoon2.5-qwen3-30b-a3b-q4_k_m.gguf"  # optional bigger summary model (Typhoon 2.5 on Qwen3-30B-A3B, 3B active; CPU only)
@@ -78,6 +81,7 @@ ENROLL_TEXT_MAX = 1500
 
 DEFAULT_SETTINGS = {
     "mode": "live",              # live = live captions while recording, after = record only, transcribe afterwards
+    "language": "th",            # default meeting language (asked at Start): th = Thai (Thai-only engines), th-en = Thai with English (a Whisper model), en = English only (Whisper large-v3-turbo)
     "accuracy": "pathumma-rnnt",      # accurate = Thonburian Whisper + Typhoon cross-check, best = Typhoon ASR Qwen 1.7B with contextual biasing (slow), large = Typhoon Whisper Large v3 (slow), npu = Whisper-medium CTC on the NPU (~30x faster than accurate), fast = Typhoon only
     "silence_ms": 1000,          # Thai end-of-speech silence (projectAI lesson: >= 1 s)
     "auto_process": True,        # transcribe automatically after the recording ends

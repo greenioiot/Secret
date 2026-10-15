@@ -68,6 +68,22 @@ Real meetings:
 - A 1-min meeting had one line holding two people. It became one line for each person, in 11 s.
 - The 125-min meeting has 16 overlaps (16 s). Separating them would add about 1–2 min.
 
+## 3b. Meeting language (Round 54, 2026-10-15)
+
+The speech models installed before Round 54 are all Thai-tuned. A 10-second English sentence (synthesized, "Good morning everyone. Today we review
+the third quarter budget. Revenue reached two point four million dollars, up twelve percent. Sarah will send the updated forecast by Friday."):
+
+| Model | Told the language is | Time (8 CPU threads) | Result |
+|---|---|---|---|
+| **Whisper large-v3-turbo** (new, models/whisper-en, int8 1.6 GB) | English | 8.3 s | Word-perfect, with "$2.4 million, up 12%" |
+| Thonburian Whisper medium (the default accurate pass) | Thai | 12.0 s | "สวัสดีครับ ทุกคน ทุกคน ทุกคน…" (loops) |
+| Typhoon Whisper Large v3 | English | 29.6 s | Half right: "Revenue reach two point four million dollars อัปเก้าเปอร์เซ็นต์…" |
+
+So each language choice maps to an engine: **Thai** keeps the Thai-only models (FastConformer, the vote, the CTC heads), **Thai + English** needs a Whisper
+model (Typhoon Whisper Large v3 when installed, else the Thonburian one: FastConformer has no English at all), **English** uses large-v3-turbo with the
+language fixed to English and no Thai realtime pass. Live captions of an English meeting come from Whisper small.en on the CPU (about 1 s per sentence,
+after the sentence ends; no interim text), because the big model pads every call to a 30 s window (5-8 s per sentence).
+
 ## 4. Summary and report (LLM)
 
 The same 5.4-minute Thai shareholder meeting was run through each model. Installed now: the two Typhoon models and Gemma 4 E4B (added 2026-10-15); the others were removed after this test:

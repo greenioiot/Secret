@@ -478,6 +478,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
   <div data-sg="asr" class="card adm"><h2>Processing order · ลำดับการประมวลผล</h2>
     <div class="kv"><span>Run the accurate (Whisper) transcription while the meeting is still being recorded (slower CPU cores, low priority) so little is left to do after you stop</span><input type="checkbox" id="s_live_accurate">
     <span>Transcribe first, then work out who said what as a follow-up task (off = identify participants first)</span><input type="checkbox" id="s_speakers_after"></div>
+    <label>Meeting language (default; asked again at Start) · ภาษาในที่ประชุม</label><select id="s_language"><option value="th">Thai · ไทย — Thai-only models (the most accurate for Thai speech)</option><option value="th-en">Thai + English · ไทยปนอังกฤษ — a Whisper model that keeps English words and sentences (Typhoon Whisper Large v3)</option><option value="en">English only — Whisper Large v3 Turbo; live captions by Whisper small.en, sentence by sentence; English summary</option></select>
     <label>Summary model · โมเดลสรุป</label><select id="s_summary_model"><option value="typhoon-4b">Typhoon 2.5 Qwen3-4B — on the NPU (faster; 37 min meeting ≈ 15 min)</option><option value="typhoon-30b">Typhoon 2.5 Qwen3-30B-A3B — CPU (richer, more accurate Thai; 37 min meeting ≈ 25 min; needs ~18 GB RAM and the downloaded model file)</option><option value="gemma4-e4b">Gemma 4 E4B (Google, 2026) — CPU (recommended: correct figures in the test and the fastest; 5 min meeting ≈ 2.5 min, 10 min ≈ 8 min; needs the downloaded model file)</option></select><div id="cmpS" class="cmp"></div>
     <p class="mute">Only used when accuracy is “accurate”. The transcript is produced by one worker lane and everything after it (participants, summary, report) by another.</p>
   </div>
@@ -707,7 +708,7 @@ function gaugesVisible() { for (const k of ["cpu", "ram", "npu", "gpu", "disk"])
 setInterval(refreshStatus, 8000); refreshStatus();
 
 /* ---------- recording ---------- */
-let planId = null, recording = false, resumeFrom = null, modeInit = false, mode = "live", ws, ctx, stream, node, wake, meetingId = null, stopping = false, pending = [], retry = 0, startedAt = 0, baseSec = 0;
+let planId = null, planLang = null, recording = false, resumeFrom = null, modeInit = false, mode = "live", ws, ctx, stream, node, wake, meetingId = null, stopping = false, pending = [], retry = 0, startedAt = 0, baseSec = 0;
 function setMode(m) { mode = m; document.querySelectorAll("#modeSeg button").forEach(b => b.classList.toggle("on", b.dataset.m === m)); $("#capCard").classList.toggle("hide", m !== "live"); }
 document.querySelectorAll("#modeSeg button").forEach(b => b.onclick = () => { if (!recording) { setMode(b.dataset.m); api("/settings", { method: "PUT", body: { mode: b.dataset.m } }).catch(() => {}); } });
 
@@ -736,6 +737,7 @@ function addCap(c) {
 }
 function connect() {
   const q = new URLSearchParams({ mode, title: $("#title").value });
+  if (!meetingId && !resumeFrom) q.set("lang", lang);
   if (packSel && !meetingId && !resumeFrom && !planId) q.set("packs", [...packSel].join("|"));
   if (planId && !meetingId && !resumeFrom) q.set("plan", planId);
   else if (recPeople.get().length && !meetingId && !resumeFrom) q.set("participants", recPeople.get().join("|"));
@@ -809,10 +811,17 @@ async function soundCheck(onTick) {   // a few seconds from the real microphone 
     const j = await r.json(); lastHeard = j.text || ""; return j.checks;
   } catch (e) { return [{ id: "sound", label: "Sound check", status: "fail", detail: "the sample could not be checked by the server: " + e.message }]; }
 }
-async function chooseMode() {   // pressed Start: this meeting with live captions, or record only? (the Record-tab switch is only the default)
+const LANG_TXT = { th: "Thai · ไทย", "th-en": "Thai + English · ไทยปนอังกฤษ", en: "English only" };
+let lang = "th";   // this meeting's language (chosen at Start; the default is in Settings; a planned meeting brings its own)
+async function chooseMode() {   // pressed Start: this meeting with live captions, or record only? and in which language? (the Record-tab switch is only the default)
   let e = null; try { e = await api("/engines"); } catch {}
+  if (e && e.language_default && !(planId && planLang)) lang = planId && planLang ? planLang : e.language_default;
+  if (planId && planLang) lang = planLang;
   const box = $("#preflight"); box.classList.remove("hide");
   return new Promise(resolve => {
+    const langNote = () => { const p = e && e.language_plans && e.language_plans[lang]; return p ? `${LANG_TXT[lang]}: live captions ${p.live.name}${p.live.note ? " (" + p.live.note + ")" : ""} · transcript ${p.after.uses}${p.after.note ? " (" + p.after.note + ")" : ""}` : LANG_TXT[lang]; };
+    const langRow = el("div", { className: "seg", id: "langSeg" }, ...Object.keys(LANG_TXT).map(k => el("button", { type: "button", className: k === lang ? "on" : "", textContent: LANG_TXT[k], onclick: () => { lang = k; [...langRow.children].forEach(b => b.classList.toggle("on", b.textContent === LANG_TXT[k])); langInfo.textContent = langNote(); } })));
+    const langInfo = el("small", { className: "mute", style: "display:block;margin-top:4px", textContent: langNote() });
     const opt = (m, title, what, model) => el("button", { className: "opt" + (m === mode ? " cur" : ""), type: "button", onclick: () => { box.classList.add("hide"); resolve(m); } },
       el("b", { textContent: (m === mode ? "● " : "○ ") + title }), el("small", { textContent: what }), model ? el("small", { textContent: model }) : "",
       e && e.recommend === m ? el("small", { className: "rec", textContent: "Recommended now: " + e.busy + ", so the processor is already busy" }) : "");
@@ -820,8 +829,9 @@ async function chooseMode() {   // pressed Start: this meeting with live caption
       el("div", { className: "opts" },
         opt("live", "Live captions · คำบรรยายสด", "Sentences appear on this screen and on the phones that joined, a moment after they are said; the full transcript is still made afterwards. Uses the processor during the meeting.", e ? "Live model: " + e.live.name + (e.live.note ? " · " + e.live.note : "") : ""),
         opt("after", "Record only · บันทึกอย่างเดียว", "Nothing is shown during the meeting; the transcript, speakers and summary are made afterwards. Lightest on the box and the safest choice when it is busy.", e ? "Transcript afterwards: " + e.after.uses : "")),
+      el("div", { style: "margin:10px 0 6px" }, el("b", { textContent: "Language spoken in this meeting · ภาษาที่ใช้ในการประชุม" }), langRow, langInfo),
       el("div", { className: "row", style: "gap:8px" }, el("button", { className: "btn", textContent: "Cancel", onclick: () => { box.classList.add("hide"); resolve(null); } }),
-        el("span", { className: "mute", style: "font-size:13px", textContent: "The highlighted one is the current default (the Mode switch above)." })));
+        el("span", { className: "mute", style: "font-size:13px", textContent: "The highlighted mode is the current default (the Mode switch above); the language default is in Settings." })));
     box.scrollIntoView({ block: "center" });  // "nearest" leaves the heading under the sticky top bar
   });
 }
@@ -838,7 +848,7 @@ async function preflight(thenStart) {
   const HEAD = "System check · ตรวจระบบก่อนเริ่ม", SRV = { label: "Server, worker, disk, models", status: "run", detail: "checking…" };
   renderPreflight([{ label: "Microphone", status: "run", detail: "listening for 1.5 s…" }, { label: "Sound check", status: "run", detail: "waits for the microphone…" }, SRV], HEAD);
   let srv, snd = [];
-  const srvP = api("/preflight?mode=" + mode).then(r => { srv = r; }).catch(e => { srv = { status: "fail", checks: [{ id: "server", label: "Server", status: "fail", detail: "not reachable: " + e.message }] }; });
+  const srvP = api("/preflight?mode=" + mode + "&lang=" + lang).then(r => { srv = r; }).catch(e => { srv = { status: "fail", checks: [{ id: "server", label: "Server", status: "fail", detail: "not reachable: " + e.message }] }; });
   const mic = await micCheck();
   lastHeard = "";
   if (mic.status !== "fail") {   // the microphone is open: ask for a sentence and send it through the real path
@@ -864,6 +874,7 @@ function showEngines(e, live) {   // the models of this meeting: shown under the
   if (!e) return;
   const strip = $("#engStrip"), chip_ = (label, text, cls) => el("span", { className: "eg " + (cls || "") }, el("i", { textContent: label }), text);
   const parts = [];
+  if (e.language && LANG_TXT[e.language]) parts.push(chip_("Language:", LANG_TXT[e.language]));
   if (mode === "live") parts.push(chip_(live ? "● Transcribing live:" : "Live captions:", e.live.name, live ? (e.live.note ? "warn" : "on") : (e.live.note ? "warn" : "")));
   else parts.push(chip_("Live captions:", "off (Record only)"));
   const a = chip_("After the meeting:", e.after.uses, e.after.ok ? "" : "warn"), su = chip_("Summary:", e.summary.uses + (e.summary.auto ? "" : " · on request"), e.summary.ok ? "" : "warn");
@@ -911,7 +922,7 @@ function endLocal() {
   ui(false); $("#meter").style.width = "0"; recWarn("");
 }
 function finished(m) {
-  endLocal(); meetingId = null; $("#timer").textContent = "00:00:00"; $("#recRemark").value = ""; recPeople.set([]); $("#title").value = ""; planId = null; loadPlans(); $("#joinPanel").classList.add("hide"); $("#joinPanel").replaceChildren(); $("#recJoin").checked = true; renderRecQr(); botEnded();
+  endLocal(); meetingId = null; $("#timer").textContent = "00:00:00"; $("#recRemark").value = ""; recPeople.set([]); $("#title").value = ""; planId = null; planLang = null; loadPlans(); $("#joinPanel").classList.add("hide"); $("#joinPanel").replaceChildren(); $("#recJoin").checked = true; renderRecQr(); botEnded();
   $("#recMsg").textContent = m.status === "recorded" ? "Saved ✓ — processing in the background. Open Meetings to follow it." : "Recording stopped (" + m.status + ").";
 }
 $("#recBtn").onclick = () => {
@@ -1675,7 +1686,7 @@ async function renderReview(body, d, busy) {
 }
 
 /* ---------- settings ---------- */
-const BOOLS = ["auto_process", "auto_summary", "mic_echo_cancel", "mic_noise_suppress", "mic_auto_gain", "identify_speakers", "live_speakers", "allow_join", "join_add_attendee", "allow_enroll", "meeting_bot_ui", "asr_npu", "live_accurate", "speakers_after", "live_partial", "numbers_arabic", "english_words", "use_materials", "apply_term_corrections", "summary_use_passages", "res_cpu", "res_ram", "res_npu", "res_gpu", "res_disk", "handsfree_enroll", "cross_meeting_match", "separate_overlaps", "guest_mic", "batch_night", "batch_weekends"], TEXTS = ["batch_start", "batch_end", "handsfree_wake", "handsfree_lang", "tts_engine", "accuracy", "live_engine", "summary_model", "glossary", "corrections", "guide_name", "guide_lang", "guide_wifi"];
+const BOOLS = ["auto_process", "auto_summary", "mic_echo_cancel", "mic_noise_suppress", "mic_auto_gain", "identify_speakers", "live_speakers", "allow_join", "join_add_attendee", "allow_enroll", "meeting_bot_ui", "asr_npu", "live_accurate", "speakers_after", "live_partial", "numbers_arabic", "english_words", "use_materials", "apply_term_corrections", "summary_use_passages", "res_cpu", "res_ram", "res_npu", "res_gpu", "res_disk", "handsfree_enroll", "cross_meeting_match", "separate_overlaps", "guest_mic", "batch_night", "batch_weekends"], TEXTS = ["language", "batch_start", "batch_end", "handsfree_wake", "handsfree_lang", "tts_engine", "accuracy", "live_engine", "summary_model", "glossary", "corrections", "guide_name", "guide_lang", "guide_wifi"];
 async function loadWords(res) {
   const r = res || await api("/words"), box = $("#wcList"); $("#s_corrections").value = r.text; if (typeof settings === "object") settings.corrections = r.text;
   box.replaceChildren(...(r.rules.length ? r.rules.map(x => el("div", { className: "row", style: "gap:8px;padding:3px 0" }, el("span", { className: "tag", textContent: x.wrong }), "→", el("b", { textContent: x.right || "(delete)" }), el("span", { style: "flex:1" }),
@@ -1962,10 +1973,11 @@ async function loadPlans() {
   $("#planBox").classList.toggle("hide", !r.rows.length && !cur);
 }
 $("#planSel").onchange = async () => {
-  const id = $("#planSel").value; planId = id || null; $("#planNote").textContent = ""; if (!id) return;
+  const id = $("#planSel").value; planId = id || null; planLang = null; $("#planNote").textContent = ""; if (!id) return;
   try { const d = await api("/meetings/" + id), m = await api(`/meetings/${id}/materials`); $("#title").value = d.state.title; recPeople.set(d.state.participants || []); $("#recRemark").value = d.state.remark || "";
     if (botCfg && d.state.agenda && d.state.agenda.length) { botCfg.agenda = JSON.parse(JSON.stringify(d.state.agenda)); renderBotCard(); }
-    $("#planNote").textContent = `${(d.state.agenda || []).length} agenda item(s) · ${m.docs.length} document(s) will be used`; } catch (e) { $("#planNote").textContent = e.message; }
+    planLang = d.state.language && LANG_TXT[d.state.language] ? d.state.language : null;
+    $("#planNote").textContent = `${(d.state.agenda || []).length} agenda item(s) · ${m.docs.length} document(s) will be used` + (planLang ? ` · language: ${LANG_TXT[planLang]}` : ""); } catch (e) { $("#planNote").textContent = e.message; }
 };
 async function startFromPlan(id) { show("rec"); await loadPlans(); $("#planSel").value = id; $("#planSel").onchange(); window.scrollTo(0, 0); }
 async function openPlan() {
@@ -1975,6 +1987,9 @@ async function renderPlan(body, d, busy) {
   const st = d.state, id = st.id; let m; try { m = await api(`/meetings/${id}/materials`); } catch (e) { body.append(el("p", { className: "mute", textContent: e.message })); return; }
   body.append(el("p", { className: "mute", textContent: "Everything here stays on this device. The system reads the documents to learn the names and terms of this meeting, repairs their spelling in the transcript, and gives the summary the agenda." }));
   if (st.status === "planned") { const dt = el("input", { type: "datetime-local", value: (st.planned_at || "").slice(0, 16) }); dt.onchange = () => patchMeeting(id, { planned_at: dt.value }); body.append(el("label", { textContent: "Planned for (date / time)" }), dt); }
+  const ls = el("select", {}, ...Object.keys(LANG_TXT).map(k => el("option", { value: k, textContent: LANG_TXT[k], selected: (st.language || settings.language || "th") === k })));
+  ls.onchange = () => patchMeeting(id, { language: ls.value });
+  body.append(el("label", { textContent: "Language spoken · ภาษาที่ใช้" }), ls, el("p", { className: "mute", textContent: st.status === "planned" ? "Chosen now for when this meeting is started (the host can still change it at Start)." : "Used when the transcript or the summary is made again (Transcribe again / Summarize again)." }));
   // vocabulary packs of this meeting
   body.append(el("h2", { style: "margin-top:18px", textContent: "Vocabulary packs · ชุดคำศัพท์" }), el("p", { className: "mute", textContent: "Domain vocabulary used for this meeting (live captions, transcript, summary). Without a choice the packs switched on in the Vocab menu apply." }));
   const packBox = el("div", { className: "tags", style: "gap:6px" }); body.append(packBox);
