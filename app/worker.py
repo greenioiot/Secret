@@ -811,7 +811,13 @@ def do_summarize(mid: str, only_report: bool = False):
     if not tr:
         raise RuntimeError("no transcript to summarize")
     store.update_state(mid, status="summarizing", phase="report" if only_report else "summary", progress=0.0, eta_s=None, error=None)
-    wait_for_ram(4.5, "starting the summary model")
+    import engines
+
+    chosen = cfg.get("summary_model") or "typhoon-4b"
+    need = 4.5  # Typhoon 4B (2.4 GB) plus room for its KV cache; a bigger model that is downloaded waits for its own measured need (30B: 18.6 GB, Gemma 4 E4B: 7.8 GB)
+    if (config.SUMMARY_GGUF.get(chosen) or config.LLM_GGUF).exists():
+        need = max(need, float(engines.SUMMARY_MEASURED.get(chosen, {}).get("ram_gb", 0)) + 0.5)
+    wait_for_ram(need, "starting the summary model")
     t0 = time.time()
     names = store.speaker_names(mid)
     rep = report.refresh(mid)

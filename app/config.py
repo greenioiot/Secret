@@ -25,7 +25,8 @@ LLAMA_BUILD = PROJECT_AI / "vlm/llama.cpp-snapdragon"                    # llama
 LLM_GGUF = PROJECT_AI / "models/typhoon2.5-qwen3-4b/typhoon2.5-qwen3-4b-q4_0.gguf"
 LLM_GGUF_30B = ROOT / "models/typhoon-30b/typhoon2.5-qwen3-30b-a3b-q4_k_m.gguf"  # optional bigger summary model (Typhoon 2.5 on Qwen3-30B-A3B, 3B active; CPU only)
 SUMMARY_GGUF = {}  # summary_model -> GGUF (filled below, after the paths); "typhoon-4b" = LLM_GGUF, the fallback
-SUMMARY_GGUF.update({"typhoon-4b": LLM_GGUF, "typhoon-30b": LLM_GGUF_30B})  # Chinda 4B, OpenThaiGPT 8B and Pathumma 8B/4B were removed 2026-10-11 (tested worse, see PERFORMANCE.md)
+LLM_GGUF_GEMMA4 = ROOT / "models/gemma4/gemma-4-E4B-it-Q4_0.gguf"  # Google Gemma 4 E4B (Apache-2.0), ggml-org Q4_0 (4.6 GB): CPU only (the NPU hangs / garbles it, see summarize.py)
+SUMMARY_GGUF.update({"typhoon-4b": LLM_GGUF, "typhoon-30b": LLM_GGUF_30B, "gemma4-e4b": LLM_GGUF_GEMMA4})  # Chinda 4B, OpenThaiGPT 8B and Pathumma 8B/4B were removed 2026-10-11 (tested worse, see PERFORMANCE.md)
 SPEAKER_EMB = ROOT / "models/speaker/campplus.onnx"        # 3D-Speaker CAM++ (zh+en) speaker embeddings, ONNX
 VOICES = DATA / "voices"                                    # enrolled voice profiles (biometric data: local only)
 PENDING = DATA / "voices_pending"                           # voices sent by participants, waiting for the host's approval
@@ -100,7 +101,7 @@ DEFAULT_SETTINGS = {
     "live_speakers": True,       # provisional speaker labels on live captions
     "allow_join": False,         # OPTIONAL: let people on the local network follow a meeting from their own device (off by default)
     "join_add_attendee": True,   # guests who join are added to the meeting's participants
-    "summary_model": "typhoon-4b",  # typhoon-4b = Typhoon2.5-Qwen3-4B (NPU, fast) | typhoon-30b = Typhoon2.5-Qwen3-30B-A3B (CPU, better Thai, slower)
+    "summary_model": "gemma4-e4b",  # gemma4-e4b = Gemma 4 E4B (CPU; correct figures, fastest: measured 2026-10-15) | typhoon-4b = Typhoon2.5-Qwen3-4B (NPU, the fallback when a model is not downloaded) | typhoon-30b = Typhoon2.5-Qwen3-30B-A3B (CPU, richest, slowest)
     "summary_on_npu": True,      # the summary model (Typhoon 4B Q4_0) runs on the Hexagon NPU: prompt reading ~7x faster; falls back to the CPU
     "live_accurate": True,       # run the accurate (Whisper) pass on finished speech DURING the meeting (cores 4-7, low priority) so little is left after it
     "speakers_after": True,      # transcribe first (text as soon as possible); who-said-what is added afterwards as a post task

@@ -663,3 +663,24 @@ and transcribed with correction by human afterward".
   Gemma 4 FLEURS speech error 0.08 (E4B, all languages) vs Pathumma 6.65 % CER on Thai here: not a replacement for the ASR yet.
 - Next step if wanted (~1 h, reversible): download the E4B Q4_0 GGUF into models/gemma4/, add summary_model "gemma4-e4b", run the same
   5.4-min / 37-min meeting comparison as for Chinda (time + invented facts), keep it only if it beats Typhoon 4B.
+
+## Round 53 (2026-10-15): Gemma 4 E4B as a summary model (CPU) · microphone list on a fresh browser · NPU stall fallback
+- New summary_model "gemma4-e4b" (Google Gemma 4 E4B, Apache-2.0, ggml-org Q4_0 GGUF 4.6 GB in models/gemma4/), the new default. Gemma has its own
+  turn format: summarize.LlamaServer asks the server's /apply-template (thinking off; hand-written <|turn> fallback), no Qwen token ban, Gemma's
+  control tokens cleaned. Measured on the scratch copy (PERFORMANCE.md §4): 5.4-min meeting 138 s with every figure right (Typhoon 4B 189 s on the
+  CPU / 200 s on the NPU with a wrong capital, month and units), 10.6-min meeting 463 s vs 822 s for the 30B (a little less complete than the 30B).
+  On the NPU Gemma either answered without headings or hung, so it always runs on the CPU (want_npu needs the Qwen family); the worker's RAM wait
+  now takes the chosen model's measured need (Gemma 7.8 GB, 30B 18.6 GB) instead of a flat 4.5 GB.
+- Gemma's small habits handled: a list title in front of the first decision ("มติ / ข้อตัดสินใจ: …") is dropped and a bare item gets its bullet
+  (the UI counts bullets); a bold title line at the top of a note ("**สรุปการประชุม Meeting …**") is dropped (map notes go through strip_echo too).
+- The NPU stalled with Typhoon 4B twice the same morning (after the first call; mid-sentence after 218 tokens, the process idle, nobody else
+  holding /dev/fastrpc-cdsp*). A summary call that times out on the NPU now touches data/.npu_llm_bad, so the retried job runs on the CPU for 30 min
+  (before: the retry went back to the NPU).
+- Record tab, microphone list (reported: "microphone cannot be selected"): before the page has been allowed to use the microphone once, Chrome
+  lists one input without id or name, which the picker filtered out, leaving only "Browser default microphone". Now a disabled hint option says
+  to press ↻, and ↻ (or opening the empty list) asks for the microphone once, releases it and lists the devices; a refusal shows what to do.
+  Verified in headless Chrome with permission allowed (2 fake devices listed, choice saved) and denied (hint + NotAllowedError message).
+- Exploration for the next round: an English meeting needs a non-Thai model. Whisper large-v3-turbo (CTranslate2, 1.6 GB) downloaded into
+  models/whisper-en/: on a synthesized English sentence it was word-perfect in 8 s (language=en), the Thonburian Thai Whisper looped on "ทุกคน",
+  Typhoon Whisper Large v3 got half of it. Qualcomm AI Hub's Gemma-4-E4B-it (GenieX qairt bundle, w4a16, QNN 2.45+, this box has 2.46) is a
+  possible NPU path later: much faster prompt reading, ~8 tok/s writing, but needs the GenieX Linux install and an adapter (no HTTP server on Linux).

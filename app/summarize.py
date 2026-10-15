@@ -185,6 +185,7 @@ class LlamaServer:
                 logging.getLogger("summarize").warning("summary_model %s is not downloaded: using the Typhoon 4B model", choice)
         if not binary.exists() or not self.gguf.exists():
             raise RuntimeError("summary model not found (llama-server / Typhoon GGUF)")
+        self.family = "gemma" if "gemma" in self.gguf.name.lower() else "qwen"  # Typhoon = Qwen3 (ChatML, empty think block); Gemma = its own turns
         import atexit
 
         atexit.register(self._kill)  # the worker runs this in a thread: a SIGTERM must not leave the model server behind
@@ -202,7 +203,10 @@ class LlamaServer:
             time.sleep(3)
         bad = config.DATA / ".npu_llm_bad"  # the NPU model died while in use: stay on the CPU for 30 minutes
         recently_bad = bad.exists() and time.time() - bad.stat().st_mtime < 1800
-        want_npu = bool(config_settings().get("summary_on_npu", True)) and "q4_0" in self.gguf.name.lower() and not recently_bad
+        # Gemma 4 E4B stays on the CPU (measured 2026-10-15): on the NPU the same prompt either hung after reading 1280 tokens or came back in a broken
+        # format (no headings), even with 256-token batches and the KV checkpoints off ('VTCM-TOO-SMALL'); on the CPU it reads 50 tok/s and writes
+        # 11 tok/s, the same writing speed as on the NPU, with a correct answer. Only the Qwen-based Typhoon 4B Q4_0 goes on the NPU.
+        want_npu = bool(config_settings().get("summary_on_npu", True)) and "q4_0" in self.gguf.name.lower() and self.family == "qwen" and not recently_bad
         if want_npu:
             # Measured on this board (Typhoon 4B Q4_0, 36 layers, 2.3 GB): one NPU core maps at most ~1.5 GB (24 layers load, 27+ fail with 'fastrpc_mmap
             # failed'), but the board has TWO cores: the whole model split over both reads 400 tok/s (75 on one core, 30-43 on the CPU). When something else
@@ -211,7 +215,7 @@ class LlamaServer:
             for dev_, ngl in attempts:
                 try:
                     self._start(True, ngl, dev_)
-                    self.backend = "NPU (both cores, all layers)" if dev_ == "HTP0,HTP1" else f"NPU ({dev_}, {ngl} of 36 layers)"
+                    self.backend = "NPU (both cores, all layers)" if dev_ == "HTP0,HTP1" else f"NPU ({dev_}, {ngl} layers)"
                     break
                 except RuntimeError as e:
                     self._kill()
@@ -221,7 +225,7 @@ class LlamaServer:
                     time.sleep(4)
         if self.backend == "CPU":
             self._start(False)
-        self.ban = self._ban_tokens()
+        self.ban = self._ban_tokens() if self.family == "qwen" else []  # the <tool_call> habit is Qwen's; Gemma has no such tokens
         self._guard_t = threading.Thread(target=self._guard, name="llm-guard", daemon=True)
         self._guard_t.start()
         return self
@@ -259,11 +263,32 @@ class LlamaServer:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
 
-    def chat(self, system: str, user: str, max_tokens: int = 700, prefill: str = "") -> str:
+    family = "qwen"
+
+    def _prompt(self, system: str, user: str, prefill: str) -> tuple[str, list[str]]:
+        """The raw prompt for /completion and the stop strings, per model family."""
+        if self.family == "gemma":
+            # Gemma 4's own turn format (the GGUF template via /apply-template, thinking off); a hand-written fallback when the server lacks it.
+            # /completion adds the BOS token itself: a <bos> written in the text would double it (Gemma is sensitive to that).
+            try:
+                req = urllib.request.Request(f"http://127.0.0.1:{config.LLM_PORT}/apply-template",
+                                             json.dumps({"messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                                                         "chat_template_kwargs": {"enable_thinking": False}}).encode(), {"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    text = json.loads(r.read())["prompt"]
+            except (OSError, ValueError, KeyError, urllib.error.URLError):  # Gemma 4's turn tokens (not Gemma 3's <start_of_turn>)
+                text = f"<|turn>system\n{system}<turn|>\n<|turn>user\n{user}<turn|>\n<|turn>model\n"
+            if text.startswith("<bos>"):
+                text = text[5:]
+            return text + prefill, ["<turn|>", "<|turn>", "<end_of_turn>"]
         # ChatML with an empty <think> block: Qwen3-based Typhoon would otherwise spend the budget on reasoning
-        prompt = f"<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n{prefill}"
+        return (f"<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n{prefill}",
+                ["<|im_end|>", "<|im_start|>"])
+
+    def chat(self, system: str, user: str, max_tokens: int = 700, prefill: str = "") -> str:
+        prompt, stop = self._prompt(system, user, prefill)
         body = {"prompt": prompt, "n_predict": max_tokens, "temperature": 0.2, "top_p": 0.9, "repeat_penalty": 1.1,
-                "stop": ["<|im_end|>", "<|im_start|>"], "stream": False, "cache_prompt": True}
+                "stop": stop, "stream": False, "cache_prompt": True}
         if self.ban:
             body["logit_bias"] = self.ban
         req = urllib.request.Request(f"http://127.0.0.1:{config.LLM_PORT}/completion", json.dumps(body).encode(),
@@ -281,6 +306,8 @@ class LlamaServer:
                     continue
                 if "30b" in self.gguf.name:
                     (config.DATA / ".llm_big_slow").touch()  # the next summary uses the 4B model for a while
+                elif self.backend != "CPU":  # the NPU stalled mid-prompt (seen 2026-10-15: one call answered, the next never did): the retry runs on the CPU for 30 min
+                    (config.DATA / ".npu_llm_bad").touch()
                 raise RuntimeError(f"the summary model did not answer in time ({type(e).__name__}): the job is retried") from e
         else:
             raise RuntimeError("recordings kept interrupting this summary step: the job is retried")
@@ -301,7 +328,7 @@ def clean(text: str) -> str:
     """Strip stray special tokens the 4B model sometimes emits and drop repeated bullet lines."""
     import re
 
-    text = re.sub(r"</?(?:tool_call|tool_response|think|\|im_start\||\|im_end\|)>", "", text).strip()
+    text = re.sub(r"</?(?:tool_call|tool_response|think|\|im_start\||\|im_end\|)>|<(?:end_of_turn|start_of_turn|bos|eos)>|<\|[a-z_]+\|>|<\|turn>|<turn\|>", "", text).strip()  # Qwen / Gemma control tokens
     seen, out = set(), []
     for ln in text.splitlines():
         key = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", ln).strip()
@@ -420,7 +447,7 @@ def summarize(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str
         for i, c in enumerate(chunks):
             key = str(i)
             if key not in part["map"]:
-                part["map"][key] = llm.chat(SYS, f"{MAP_TASK}{gl}\n\nบันทึก:\n{c}" + (references(mid, c) if use_refs else ""), MAP_TOKENS)
+                part["map"][key] = strip_echo(llm.chat(SYS, f"{MAP_TASK}{gl}\n\nบันทึก:\n{c}" + (references(mid, c) if use_refs else ""), MAP_TOKENS))
                 store.write_json(part_file, part)
             notes.append(f"(ส่วนที่ {i + 1}/{len(chunks)})\n{part['map'][key]}")
             progress((i + 1) / (len(chunks) + 1) * 0.6)
@@ -474,8 +501,17 @@ def summarize(llm: LlamaServer, mid: str, segs: list[dict], names: dict[str, str
 
 
 def _drop_template(text: str) -> str:
-    """The bigger model sometimes repeats the format line it was given ('เรื่อง – ผลที่ตกลง ...'): drop it."""
-    return "\n".join(ln for ln in text.splitlines() if not re.match(r"^\s*(เรื่อง\s*[–-]\s*ผลที่ตกลง|ผู้รับผิดชอบ\s*[–-]\s*งาน\s*[–-]\s*กำหนดเวลา)", ln)).strip()
+    """The bigger model sometimes repeats the format line it was given ('เรื่อง – ผลที่ตกลง ...'): drop it. Gemma writes the list's title in front of
+    the first item ('มติ / ข้อตัดสินใจ: เรื่อง – อนุมัติ …'): the title goes, and an item without a bullet gets one (the UI counts bullets)."""
+    out = []
+    for ln in text.splitlines():
+        if re.match(r"^\s*(เรื่อง\s*[–-]\s*ผลที่ตกลง|ผู้รับผิดชอบ\s*[–-]\s*งาน\s*[–-]\s*กำหนดเวลา)", ln):
+            continue
+        ln = re.sub(r"^\s*\**(มติ\s*/\s*ข้อตัดสินใจ|งานที่ต้องทำ|รายการ[^:：*]{0,20})\**\s*[:：][\s*:：]*", "", ln)
+        if ln.strip() and not re.match(r"^\s*(?:[-*•]|\d+[.)])\s", ln) and not ln.startswith(" ") and not re.match(r"^\s*(ไม่พบ|ไม่มี)", ln):  # "nothing found" is a sentence, not an item
+            ln = "- " + ln.strip()
+        out.append(ln)
+    return "\n".join(out).strip()
 
 
 def _sections(md: str) -> dict[str, str]:
@@ -497,6 +533,8 @@ def strip_echo(md: str, terms: list[str] | None = None) -> str:
     for ln in md.splitlines():
         if re.match(r"^\s*\*{0,2}(หมายเหตุ|คำศัพท์/ชื่อที่เกี่ยวข้อง)[^\n]*?\*{0,2}\s*:?\s*$", ln) and len(ln.strip(" *:")) < 12:
             continue
+        if not out and re.match(r"^\s*\*{0,2}#{0,3}\s*(สรุป(การ)?ประชุม|Meeting \d{4}-\d\d-\d\d|บันทึกการประชุม)[^\n]{0,60}\*{0,2}\s*$", ln):
+            continue  # Gemma opens its notes with a title line ("**สรุปการประชุม Meeting 2026-10-10 09:13**"): not a note
         if terms and sum(1 for t in terms[:12] if t in ln) >= 5:
             continue
         out.append(ln)

@@ -14,7 +14,7 @@ ACCURACY = {  # accuracy mode -> name shown to the user
     **{k: v[4] for k, v in config.WHISPER_CT2.items()},
 }
 SUMMARY = {
-    "typhoon-4b": "Typhoon 2.5 Qwen3-4B", "typhoon-30b": "Typhoon 2.5 Qwen3-30B-A3B",
+    "typhoon-4b": "Typhoon 2.5 Qwen3-4B", "typhoon-30b": "Typhoon 2.5 Qwen3-30B-A3B", "gemma4-e4b": "Gemma 4 E4B (Google)",
 }
 DEFAULT_WHISPER = "Thonburian Whisper medium"
 # measured on this box (PERFORMANCE.md): character error rate on 80 FLEURS Thai clips, memory while it runs, where it runs, what else to know.
@@ -33,6 +33,7 @@ MEASURED = {
 SUMMARY_MEASURED = {
     "typhoon-4b": {"ram_gb": 2.4, "where": "NPU", "note": "Faster and leaves the CPU free; can get some numbers wrong, so check figures."},
     "typhoon-30b": {"ram_gb": 18.6, "where": "CPU", "note": "Best in the side-by-side test: correct numbers, names and places; nothing invented."},
+    "gemma4-e4b": {"ram_gb": 7.8, "where": "CPU", "note": "Google's Gemma 4 (2026): correct numbers and names in the side-by-side test, nothing invented; reads 50 and writes 11 tokens/s on the CPU (the NPU hangs with it)."},
 }
 LIVE = {"typhoon": "Typhoon realtime CTC", "wctc": "Whisper-medium CTC", "pathumma-rnnt": "Pathumma FastConformer (NECTEC)"}
 

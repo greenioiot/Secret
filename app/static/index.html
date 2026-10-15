@@ -478,7 +478,7 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
   <div data-sg="asr" class="card adm"><h2>Processing order · ลำดับการประมวลผล</h2>
     <div class="kv"><span>Run the accurate (Whisper) transcription while the meeting is still being recorded (slower CPU cores, low priority) so little is left to do after you stop</span><input type="checkbox" id="s_live_accurate">
     <span>Transcribe first, then work out who said what as a follow-up task (off = identify participants first)</span><input type="checkbox" id="s_speakers_after"></div>
-    <label>Summary model · โมเดลสรุป</label><select id="s_summary_model"><option value="typhoon-4b">Typhoon 2.5 Qwen3-4B — on the NPU (faster; 37 min meeting ≈ 15 min)</option><option value="typhoon-30b">Typhoon 2.5 Qwen3-30B-A3B — CPU (richer, more accurate Thai; 37 min meeting ≈ 25 min; needs ~18 GB RAM and the downloaded model file)</option></select><div id="cmpS" class="cmp"></div>
+    <label>Summary model · โมเดลสรุป</label><select id="s_summary_model"><option value="typhoon-4b">Typhoon 2.5 Qwen3-4B — on the NPU (faster; 37 min meeting ≈ 15 min)</option><option value="typhoon-30b">Typhoon 2.5 Qwen3-30B-A3B — CPU (richer, more accurate Thai; 37 min meeting ≈ 25 min; needs ~18 GB RAM and the downloaded model file)</option><option value="gemma4-e4b">Gemma 4 E4B (Google, 2026) — CPU (recommended: correct figures in the test and the fastest; 5 min meeting ≈ 2.5 min, 10 min ≈ 8 min; needs the downloaded model file)</option></select><div id="cmpS" class="cmp"></div>
     <p class="mute">Only used when accuracy is “accurate”. The transcript is produced by one worker lane and everything after it (participants, summary, report) by another.</p>
   </div>
   <div data-sg="words" class="card adm"><h2>Planned meetings &amp; documents · แผนและเอกสาร</h2>
@@ -574,12 +574,24 @@ async function getMic(audio, msgEl) {   // the chosen microphone, or the default
   catch (e) { if (!micConstraint().deviceId || !["OverconstrainedError", "NotFoundError"].includes(e.name)) throw e;
     const s = await navigator.mediaDevices.getUserMedia({ audio }); if (msgEl) setTimeout(() => { msgEl.textContent = "⚠ The chosen microphone is not connected: using the default one. " + msgEl.textContent; }, 1500); return s; }
 }
+let micAsked = false;
+async function allowMic() {   // the browser shows device ids and names only after the page was allowed to use the microphone once: ask (a user gesture), then release it
+  if (!window.isSecureContext) { $("#recMsg").textContent = "The microphone needs HTTPS: open this page via https://"; return false; }
+  try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); micAsked = true; return true; }
+  catch (e) { $("#recMsg").textContent = "The browser did not allow the microphone (" + e.name + "): allow it in the address bar's site settings, then press ↻."; return false; }
+}
 async function listMics() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   let devs = []; try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput"); } catch { return; }
   const sel = $("#micSel"), cur = localStorage.getItem("secrets.mic") || "";
-  sel.replaceChildren(el("option", { value: "", textContent: "Browser default microphone" }), ...devs.filter(d => d.deviceId && d.deviceId !== "default").map((d, i) => el("option", { value: d.deviceId, textContent: d.label || `Microphone ${i + 1} (name shown after the first recording)`, selected: d.deviceId === cur })));
+  const known = devs.filter(d => d.deviceId && d.deviceId !== "default");
+  sel.replaceChildren(el("option", { value: "", textContent: "Browser default microphone" }), ...known.map((d, i) => el("option", { value: d.deviceId, textContent: d.label || `Microphone ${i + 1} (name shown after the first recording)`, selected: d.deviceId === cur })));
+  if (!known.length && devs.length) sel.append(el("option", { value: "", disabled: true, textContent: "(press ↻ and allow the microphone to see the list)" }));  // Chrome before permission: inputs without id or name
   if (cur && !devs.some(d => d.deviceId === cur)) sel.append(el("option", { value: cur, textContent: "Saved microphone (not connected now)", selected: true }));
+  return known.length;
+}
+async function refreshMics() {   // ↻, or the first opening of the list while it is empty: get permission once, then list
+  if (!(await listMics()) && !micAsked && await allowMic()) await listMics();
 }
 /* ---------- resource bar (CPU / RAM / NPU / GPU / disk) + live-meeting banner ---------- */
 let sysOn = false, lastSys = null;
@@ -2501,7 +2513,8 @@ $("#hfBtn").onclick = async () => {
 
 loadMe().then(() => { if (isAdmin()) loadMail(); });
 $("#micSel").onchange = () => { localStorage.setItem("secrets.mic", $("#micSel").value); $("#recMsg").textContent = $("#micSel").value ? "Microphone chosen: " + $("#micSel").selectedOptions[0].textContent : "Using the browser's default microphone."; };
-$("#micRefresh").onclick = listMics; listMics(); if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener("devicechange", listMics);
+$("#micRefresh").onclick = refreshMics; listMics(); if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener("devicechange", listMics);
+$("#micSel").onpointerdown = () => { if ($("#micSel").options.length < 2 || [...$("#micSel").options].every(o => !o.value)) refreshMics(); };  // nothing to choose yet: ask for the microphone
 refreshPeople(); setMode("live"); loadResume(); loadBotInfo().then(() => { renderBotCard(); botUiVisible(); });
 </script>
 </body>

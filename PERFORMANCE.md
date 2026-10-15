@@ -70,18 +70,23 @@ Real meetings:
 
 ## 4. Summary and report (LLM)
 
-The same 5.4-minute Thai shareholder meeting was run through each model. Only the two Typhoon models are still installed; the others were removed after this test:
+The same 5.4-minute Thai shareholder meeting was run through each model. Installed now: the two Typhoon models and Gemma 4 E4B (added 2026-10-15); the others were removed after this test:
 
 | Model | Runs on | Time | Quality (read side by side) |
 |---|---|---|---|
-| Typhoon 2.5 Qwen3-4B | NPU, both cores (prompt read at 400 tokens/s, written at 7–9 tokens/s) | 200 s | Some wrong numbers |
+| Typhoon 2.5 Qwen3-4B | NPU, both cores (prompt read at 400 tokens/s, written at 7–9 tokens/s); CPU 57 / 11.5 tokens/s | 200 s (NPU), 189 s (CPU, 2026-10-15) | Some wrong numbers: in the 2026-10-15 run the paid-up capital became 20,000,000 instead of 2,016,929,700, the month of the meeting was wrong, share counts were written as baht |
+| **Gemma 4 E4B (Google, 2026-10-15)** | CPU (prompt read at 50, written at 11 tokens/s, 7.8 GB RAM); the NPU is not used (see below) | **138 s** | **Correct**: paid-up capital 2,016,929,700, 29 in person, 1,310 by proxy, the board decision of 24 Feb; nothing invented. Fewer invented details than the 4B, less rich than the 30B |
 | Typhoon 2.5 Qwen3-30B-A3B (**your current setting**) | CPU (32 / 7.3 tokens/s) | 381 s | **Best**: correct numbers, names and room; nothing invented |
 | OpenThaiGPT ThaiLLM 8B | CPU | 360 s | Medium |
 | OpenThai Chinda 4B | NPU | about the same as Typhoon 4B | Fluent, but invents more |
 | Pathumma ThaiLLM 8B | CPU | 359 s | Invented a chairman and percentages: not recommended |
 | Pathumma LLM 4B | CPU (fails on the NPU) | 138 s | Empty key points and an invented date: not recommended |
 
-What this means for you: with the 30B model, your real meetings took 650–660 s for the summary even when the meeting itself lasted 0.5–1 minute. The summary is now by far the slowest step after a meeting.
+Gemma 4 E4B on the 10.6-minute insurance meeting (9 model calls): 463 s against 822 s for the 30B model on the same transcript; the text was faithful (SLA, 96.5 % / 95 % data delivery, the June target, Mr.Eddy's points) but it missed two items the 30B kept (the 99 % year-end target, the hologram system).
+
+Gemma 4 E4B on the NPU (llama.cpp Hexagon backend, Q4_0, both cores): reads 120 and writes 10 tokens/s, i.e. no faster at writing than the CPU, and it is not reliable: one run answered without the required headings, the next hung after reading 1280 tokens of the prompt. The same day Typhoon 4B stalled on the NPU twice (once after its first call, once mid-sentence) with nothing else holding the NPU. Gemma therefore always runs on the CPU, and a summary call that times out on the NPU sends the retry to the CPU for 30 minutes.
+
+What this means for you: Gemma 4 E4B is the best value now (correct figures, faster than both Typhoon models, no NPU dependence); the 30B is still the richest. With the 30B model, your real meetings took 650–660 s for the summary even when the meeting itself lasted 0.5–1 minute. The summary is by far the slowest step after a meeting.
 
 ## 5. Other activities
 
@@ -106,7 +111,7 @@ Since Round 43 nothing is shown live by default (Record only): the meeting is tr
 | Overlap detection | 20 s |
 | Voice separation (typical meeting: under 1 min of overlap) | under 1 min |
 | Participants' phones (only when used) | about 10–20 s per phone per 10 minutes |
-| Summary + report with the 30B model | the largest part: about 7 min for a 5-min meeting, much longer for an hour |
+| Summary + report | the largest part: 30B about 7 min for a 5-min meeting, Gemma 4 E4B about 2.5 min, much longer for an hour |
 
 The biggest gain left: the 4B model on both NPU cores, with a quality cost. Or keep the 30B model only for important meetings.
 
