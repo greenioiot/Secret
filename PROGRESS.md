@@ -713,3 +713,14 @@ and transcribed with correction by human afterward".
   Thai sentence and the English one), Thai record-only (FastConformer, Thai). Headless Chrome: the Start dialog shows the three buttons with the
   default highlighted, choosing "English only" updates the model line, Cancel closes; Settings has the select; no page errors. test_language.py 24/24;
   the Round 52 dialog test re-run (below).
+
+## Explored 2026-10-15 (no code change): Gemma 4 E4B from Qualcomm AI Hub on the NPU through GenieX
+- GenieX CLI v0.8.0 installed without sudo under models/geniex (launcher ~/.local/bin/geniex; it bundles QAIRT 2.45, detects the board as
+  Dragonwing IQ-9075); `geniex pull ai-hub-models/Gemma-4-E4B-it --model-hub aihub` (no account or token needed) put the W4A16 bundle (9.7 GB,
+  4 context binaries + a 5.6 GB int16 embedding table, context 4096, one NPU core) in models/geniex-data; `geniex serve` gives an OpenAI-style
+  /v1/chat/completions on 127.0.0.1:18181 (the summarizer could talk to it with a small adapter).
+- Measured on the real 1440-token summary prompt of the 5.4-min meeting: prompt 550 tok/s, first token 2.6 s, 9.7 tok/s writing, 23-28 s per
+  call (CPU GGUF: 74 s). Quality in Thai: vague, no figures or names, headings ignored, with a note that the notes are "fragmentary" — the same
+  with greedy decoding and without a system role; an English prompt was answered correctly. The Q4_0 GGUF on the CPU gets the same Thai prompt
+  right, so the AI Hub quantization is the loss. Decision: not used; Gemma stays on the CPU (PERFORMANCE.md §4). The ~10 GB can be removed with
+  `rm -rf models/geniex models/geniex-data ~/.local/bin/geniex` if the space is wanted.
