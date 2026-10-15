@@ -216,6 +216,8 @@ def write_problem(u: dict, path: str) -> str | None:
         return None
     if u["role"] == "viewer":
         return "your account is read-only (Viewer)"
+    if MEETING_RE.match(path) and (MEETING_RE.match(path).group(2) or "") == "/email":
+        return None  # e-mailing changes nothing: every Member / Admin may send a meeting they can read (like Export .md)
     if path.startswith(ADMIN_WRITE):
         return None if u["role"] == "admin" else "only an administrator can change this"
     if path.startswith(MEMBER_WRITE):
@@ -371,8 +373,29 @@ def api_logout(request: Request):
 @app.get("/api/me")
 def api_me(request: Request):
     u = who(request)
+    mcfg = mailer.load()
     return {"user": u["user"], "name": u["name"], "role": u["role"], "csrf": u.get("csrf", ""), "expires": u.get("expires"),
-            "theme": auth.theme_of(u["user"], u["role"]), "themes": auth.themes_for(u["role"])}
+            "theme": auth.theme_of(u["user"], u["role"]), "themes": auth.themes_for(u["role"]), "email": _my_email(u["user"], mcfg)}
+
+
+def _my_email(username: str | None, mcfg: dict) -> dict:
+    """What this account needs to send a meeting: whether e-mail is on, its own To / CC, the shared defaults and attachment defaults (never the SMTP account)."""
+    p = auth.email_prefs(username)
+    return {"enabled": bool(mcfg["enabled"]), "to": p["to"], "cc": p["cc"], "shared_to": list(mcfg.get("default_to") or []),
+            "attach": {k: bool(mcfg.get("attach_" + k)) for k in ("summary", "report", "transcript")}}
+
+
+@app.post("/api/me/email")
+async def api_my_email(request: Request):
+    """Saves the account's own recipients (To / CC) for the meeting e-mail."""
+    u = who(request)
+    b = await request.json()
+    try:
+        to, cc = mailer.split_cc(b.get("to") or [], b.get("cc") or [])
+        auth.set_email_prefs(u["user"], to, cc)
+    except (ValueError, TypeError, KeyError) as e:
+        raise HTTPException(400, str(e).strip("'")) from None
+    return _my_email(u["user"], mailer.load())
 
 
 @app.post("/api/me/theme")
@@ -2488,13 +2511,19 @@ async def api_email_meeting(mid: str, request: Request):
     cfg = mailer.load()
     if not cfg["enabled"]:
         raise HTTPException(409, "E-mail is turned off in Settings.")
+    u = who(request)
     body = await request.json()
     opts = {f"attach_{k}": bool(v) for k, v in (body.get("attach") or {}).items() if k in ("summary", "report", "transcript")}
+    own_to, own_cc = mailer.recipients_for(u["user"], cfg)
+    to = body["to"] if "to" in body else own_to   # a missing field means "my recipients"; an empty one means none
+    cc = body["cc"] if "cc" in body else own_cc
     try:
-        sent = await asyncio.to_thread(mailer.send_meeting, mid, body.get("to") or cfg["default_to"], opts)
+        if body.get("save"):   # remember these as the account's recipients for next time
+            auth.set_email_prefs(u["user"], *mailer.split_cc(to, cc))
+        sent = await asyncio.to_thread(mailer.send_meeting, mid, to, opts, False, cc, u["user"])
     except Exception as e:  # noqa: BLE001
         raise HTTPException(400, mailer.friendly_error(e, cfg))
-    return {"ok": True, "to": sent, "log": (store.load_state(mid) or {}).get("email_log", [])}
+    return {"ok": True, "to": sent["to"], "cc": sent["cc"], "log": (store.load_state(mid) or {}).get("email_log", [])}
 
 
 def _bot_wants_llm() -> bool:

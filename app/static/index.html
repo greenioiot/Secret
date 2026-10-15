@@ -446,9 +446,9 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
     <div class="row" style="margin-top:4px"><span class="mute" id="m_pwstate"></span><button class="btn" id="m_clearpw" style="padding:2px 10px;font-size:13px">Remove saved password</button></div>
     <div class="row"><div style="flex:1;min-width:160px"><label>From name</label><input type="text" id="m_from_name"></div>
       <div style="flex:1;min-width:200px"><label>From address</label><input type="text" id="m_from_addr" placeholder="you@example.com"></div></div>
-    <label>Default recipients (comma separated)</label><input type="text" id="m_default_to" placeholder="boss@example.com, team@example.com">
+    <label>Default recipients (comma separated) — for accounts that have no recipients of their own (each account sets its To / CC under Accounts → My account)</label><input type="text" id="m_default_to" placeholder="boss@example.com, team@example.com">
     <div class="kv" style="margin-top:12px"><span>Verify the server's certificate (recommended)</span><input type="checkbox" id="m_verify_cert">
-      <span>Send automatically to the default recipients when a meeting has been summarized</span><input type="checkbox" id="m_auto_send">
+      <span>Send automatically when a meeting has been summarized (to the owner's own To / CC, or the default recipients)</span><input type="checkbox" id="m_auto_send">
       <span>Attach summary (.md)</span><input type="checkbox" id="m_attach_summary"><span>Attach participation report (.md)</span><input type="checkbox" id="m_attach_report">
       <span>Attach full transcript (.md)</span><input type="checkbox" id="m_attach_transcript"></div>
     <div class="row" style="margin-top:14px"><button class="btn pri" id="m_save">Save e-mail settings</button>
@@ -539,6 +539,11 @@ label.btn{display:inline-block;border:1px solid var(--line);background:var(--car
       <div style="flex:1;min-width:160px"><label>Repeat new password</label><input type="password" id="pw_new2" autocomplete="new-password"></div></div>
     <div class="row" style="margin-top:10px"><button class="btn pri" id="pw_save">Change password</button><button class="btn" id="signOut2">Sign out</button><span class="mute" id="pw_msg"></span></div>
     <p class="mute">Changing the password signs out your other browsers. Sessions end after 8 hours.</p>
+    <h2 style="margin-top:18px">My e-mail recipients · ผู้รับอีเมลของฉัน</h2>
+    <p class="mute" id="me_mail_note">Who gets a meeting when you press “Email…” (and when a meeting you own is sent automatically). Each account has its own To and CC; comma separated, up to 20 addresses in all.</p>
+    <div class="row"><div style="flex:1;min-width:220px"><label>To</label><textarea id="me_to" style="min-height:48px" placeholder="boss@example.com, team@example.com"></textarea></div>
+      <div style="flex:1;min-width:220px"><label>CC</label><textarea id="me_cc" style="min-height:48px" placeholder="manager@example.com"></textarea></div></div>
+    <div class="row" style="margin-top:8px"><button class="btn pri" id="me_mail_save">Save my recipients</button><span class="mute" id="me_mail_msg"></span></div>
   </div>
   <div data-sg="acc" class="card adm"><h2>Enterprise single sign-on (preview) · SSO องค์กร</h2>
     <p class="mute">Placeholder for company sign-in (SAML 2.0 / OpenID Connect: Microsoft Entra ID, Google Workspace, Okta). Not connected: the fields below are disabled and nothing is sent anywhere. Local accounts keep working when SSO is added.</p>
@@ -1399,7 +1404,7 @@ async function loadDetail(poll) {
       el("button", { className: "btn", textContent: "Summarize again", disabled: busy || !d.transcript, onclick: () => again("summarize") }),
       d.state.recording_now ? el("button", { className: "btn danger", textContent: "End meeting for everyone", onclick: () => terminateMeeting(st.id, st.title) }) : "",
       d.state.recording_now ? el("button", { className: "btn", textContent: "Cancel meeting", onclick: () => cancelMeeting(st.id, st.title) }) : "",
-      mailCfg.enabled ? el("button", { className: "btn", textContent: "Email…", disabled: busy || !(d.summary || d.report), title: d.summary || d.report ? "" : "Nothing to send yet", onclick: () => emailDialog(d) }) : "",
+      (me.email || {}).enabled ? el("button", { className: "btn rok", textContent: "Email…", disabled: busy || !(d.summary || d.report) || me.role === "viewer", title: d.summary || d.report ? "Send to your own To / CC (Accounts → My account)" : "Nothing to send yet", onclick: () => emailDialog(d) }) : "",
       el("a", { className: "btn", href: `/api/meetings/${st.id}/export.md`, textContent: "Export .md" }),
       el("button", { className: "btn danger", textContent: "Delete", onclick: async () => { if (confirm("Delete this meeting and its audio permanently?")) { await api("/meetings/" + st.id, { method: "DELETE" }); openId = null; show("list"); } } }))));
   if (audioEl) { audioEl.addEventListener("loadedmetadata", () => { audioEl.currentTime = keepT; if (playing) audioEl.play(); }, { once: true }); }
@@ -1802,7 +1807,7 @@ function mailBody() {
   MAIL_TEXT.forEach(k => b[k] = $("#m_" + k).value); MAIL_BOOL.forEach(k => b[k] = $("#m_" + k).checked);
   if ($("#m_password").value) b.password = $("#m_password").value; return b;
 }
-$("#m_save").onclick = async () => { try { mailCfg = await api("/email", { method: "PUT", body: mailBody() }); await fillMail(); mailMsg("Saved ✓", true); } catch (e) { mailMsg(e.message, false); } };
+$("#m_save").onclick = async () => { try { mailCfg = await api("/email", { method: "PUT", body: mailBody() }); await fillMail(); loadMe(); mailMsg("Saved ✓", true); } catch (e) { mailMsg(e.message, false); } };
 $("#m_clearpw").onclick = async () => { if (confirm("Remove the saved password?")) { mailCfg = await api("/email", { method: "PUT", body: { clear_password: true } }); await fillMail(); mailMsg("Password removed.", true); } };
 $("#m_test").onclick = async () => {
   const btn = $("#m_test"); btn.disabled = true; mailMsg("Saving and sending… (up to 30 s)", true);
@@ -1810,20 +1815,31 @@ $("#m_test").onclick = async () => {
   catch (e) { mailMsg(e.message, false); } finally { btn.disabled = false; }
 };
 function emailDialog(d) {
-  const st = d.state, c = mailCfg, ov = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;display:grid;place-items:center;padding:16px" });
-  const to = el("textarea", { style: "min-height:60px", placeholder: "name@example.com, other@example.com" }); to.value = (c.default_to || []).join(", ");
-  const chk = (k, label) => { const i = el("input", { type: "checkbox" }); i.checked = !!c["attach_" + k]; return [i, el("label", { style: "display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--ink)" }, i, label)]; };
+  const st = d.state, c = me.email || {}, ov = el("div", { style: "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;display:grid;place-items:center;padding:16px" });
+  const own = (c.to || []).length > 0;   // this account's own recipients, else the shared default ones
+  const to = el("textarea", { style: "min-height:48px", placeholder: "name@example.com, other@example.com" }); to.value = (own ? c.to : c.shared_to || []).join(", ");
+  const cc = el("textarea", { style: "min-height:40px", placeholder: "optional: manager@example.com" }); cc.value = (c.cc || []).join(", ");
+  const save = el("input", { type: "checkbox" }); save.checked = true;
+  const chk = (k, label) => { const i = el("input", { type: "checkbox" }); i.checked = !!(c.attach || {})[k]; return [i, el("label", { style: "display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--ink)" }, i, label)]; };
   const [aS, lS] = chk("summary", "Summary (.md)"), [aR, lR] = chk("report", "Participation report (.md)"), [aT, lT] = chk("transcript", "Full transcript (.md)");
   const msg = el("div", { style: "margin-top:10px" }), send = el("button", { className: "btn pri", textContent: "Send" }), cancel = el("button", { className: "btn", textContent: "Close", onclick: () => ov.remove() });
   send.onclick = async () => {
     send.disabled = true; msg.style.color = "var(--mute)"; msg.textContent = "Sending… (up to 30 s)";
-    try { const r = await api(`/meetings/${st.id}/email`, { method: "POST", body: { to: to.value, attach: { summary: aS.checked, report: aR.checked, transcript: aT.checked } } }); msg.style.color = "var(--ok)"; msg.textContent = "Sent to " + r.to.join(", ") + " ✓"; loadDetail(); }
+    try {
+      const r = await api(`/meetings/${st.id}/email`, { method: "POST", body: { to: to.value, cc: cc.value, save: save.checked, attach: { summary: aS.checked, report: aR.checked, transcript: aT.checked } } });
+      msg.style.color = "var(--ok)"; msg.textContent = "Sent to " + r.to.join(", ") + (r.cc.length ? " · cc " + r.cc.join(", ") : "") + " ✓";
+      if (save.checked) { me.email = Object.assign({}, me.email, { to: r.to, cc: r.cc }); fillMyMail(); }
+      loadDetail();
+    }
     catch (e) { msg.style.color = "var(--bad)"; msg.textContent = e.message; } finally { send.disabled = false; }
   };
-  const prev = (st.email_log || []).slice(-3).map(e => `${e.time} → ${e.to.length} recipient(s): ${e.ok ? "sent" : "failed"}`);
+  const prev = (st.email_log || []).slice(-3).map(e => `${e.time} → ${e.to.length}${(e.cc || []).length ? " + " + e.cc.length + " cc" : ""}${e.by ? " by " + e.by : e.auto ? " (auto)" : ""}: ${e.ok ? "sent" : "failed"}`);
   ov.append(el("div", { className: "card", style: "width:min(520px,100%);margin:0" }, el("h2", { textContent: "Email this meeting · ส่งอีเมล" }),
     el("div", { className: "mute", textContent: "Sends the summary and the participation report as the e-mail text. The audio is never sent." }),
-    el("label", { textContent: "Recipients" }), to, el("label", { textContent: "Attach" }), lS, lR, lT,
+    el("label", { textContent: "To" + (own ? " (my recipients)" : c.shared_to && c.shared_to.length ? " (the shared default recipients — you have none of your own yet)" : "") }), to,
+    el("label", { textContent: "CC" }), cc,
+    el("label", { style: "display:flex;gap:8px;align-items:center;margin:6px 0;color:var(--ink)" }, save, "Remember these as my To / CC for next time"),
+    el("label", { textContent: "Attach" }), lS, lR, lT,
     prev.length ? el("div", { className: "mute", style: "margin-top:8px", textContent: "Earlier: " + prev.join(" · ") }) : "", msg,
     el("div", { className: "row", style: "margin-top:12px;justify-content:flex-end" }, cancel, send)));
   ov.onclick = e => { if (e.target === ov) ov.remove(); }; document.body.append(ov);
@@ -2028,11 +2044,22 @@ async function loadMe() {
   try { me = await api("/me"); } catch { return; }
   document.body.classList.remove("role-admin", "role-member", "role-viewer"); document.body.classList.add("role-" + me.role);
   $("#userBox").replaceChildren(el("span", { textContent: me.name, title: "Signed in as " + me.user }), el("span", { className: "rb", textContent: me.role }), el("button", { className: "btn", textContent: "Sign out", style: "padding:3px 10px", onclick: signOut }));
-  applyTheme(me.theme || "auto"); renderThemes();
+  applyTheme(me.theme || "auto"); renderThemes(); fillMyMail();
   renderRecQr();  // the admin-only "Turn on joining" button needs the role
   $("#meInfo").textContent = `${me.name} (${me.user}) · ${me.role}` + (me.expires ? ` · this session ends at ${new Date(me.expires * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "");
   if (me.role === "viewer" && !$("#roRec")) { $("#tab-rec").prepend(el("div", { className: "banner", id: "roRec", textContent: "Your account is read-only (Viewer): you can open and read every meeting, but not record or change anything. Ask an administrator for the Member role." })); $("#recBtn").disabled = true; }
 }
+function fillMyMail() {
+  const c = me.email || {}; $("#me_to").value = (c.to || []).join(", "); $("#me_cc").value = (c.cc || []).join(", ");
+  $("#me_mail_note").textContent = (c.enabled ? "" : "E-mail is turned off: an administrator turns it on under Settings → Bot, email & network. ")
+    + "Who gets a meeting when you press “Email…” (and when a meeting you own is sent automatically). Each account has its own To and CC; comma separated, up to 20 addresses in all."
+    + ((c.to || []).length || !(c.shared_to || []).length ? "" : " Until you add your own, the shared default recipients are used: " + c.shared_to.join(", "));
+}
+$("#me_mail_save").onclick = async () => {
+  const m = $("#me_mail_msg"); m.style.color = "";
+  try { me.email = await api("/me/email", { method: "POST", body: { to: $("#me_to").value, cc: $("#me_cc").value } }); fillMyMail(); m.style.color = "var(--ok)"; m.textContent = "Saved for your account ✓"; }
+  catch (e) { m.style.color = "var(--bad)"; m.textContent = e.message; }
+};
 const THEME_TXT = { auto: "Device · ตามเครื่อง", dark: "Dark · มืด", light: "White · ขาว", gray: "Gray · เทา (admin)" };
 function applyTheme(t) {   // the account's choice; localStorage lets the next page load paint in it before /api/me answers
   const r = document.documentElement;

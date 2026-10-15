@@ -714,6 +714,27 @@ and transcribed with correction by human afterward".
   default highlighted, choosing "English only" updates the model line, Cancel closes; Settings has the select; no page errors. test_language.py 24/24;
   the Round 52 dialog test re-run (below).
 
+## Round 55 (2026-10-15): e-mail recipients per account — To and CC
+- Why: the e-mail (Round 5) had one shared recipient list set by the administrator, and the "Email…" button only appeared for administrators
+  (the UI read the admin-only /api/email). Now every account keeps its own recipients and every Member / Admin can send.
+- Per account: auth.email_prefs / set_email_prefs keep "email_to" and "email_cc" in users.json next to the theme. GET /api/me carries
+  "email": {enabled, to, cc, shared_to, attach} (never the SMTP account); POST /api/me/email {to, cc} saves them (validated by mailer.split_cc:
+  addresses checked, an address in both lists stays in To only, at most 20 in all). Settings → Accounts → My account has "My e-mail recipients"
+  (To / CC, Save), with a note when e-mail is off or when the shared default recipients still apply.
+- Sending: POST /api/meetings/{id}/email takes "to", "cc" and "save" (remember as my recipients); a missing field means the account's own
+  recipients, which fall back to the shared "Default recipients" of Settings → Email when the account has no To of its own
+  (mailer.recipients_for). mailer.send writes the Cc header and sends the envelope to To + CC. The email_log entry and the History line carry
+  "cc" and "by" (the account), or "(automatic)". Every Member / Admin may e-mail any meeting they can read (like Export .md: it changes nothing);
+  a Viewer cannot send. The dialog shows To (prefilled: my recipients, or the shared default with a note), CC, "Remember these as my To / CC
+  for next time" (on by default) and the attachments.
+- Automatic send (worker.auto_email): to the owner's own To / CC, else the shared default recipients; unchanged otherwise (once per meeting).
+- Test tools/tests/test_email_accounts.py (28 checks) on the scratch instance with its own plain SMTP server on 127.0.0.1:8025: /api/me shape,
+  409 while e-mail is off, saving per account (dedup, bad address, >20, viewer may keep a list, /api/users leaks nothing), a member mailing a
+  meeting it does not own with its To + CC (envelope, To/Cc headers, subject, attachment, log entry with cc + by), explicit lists with save
+  true/false, empty To 400, viewer 403, admin falling back to the shared default, recipients_for for the automatic send. Headless Chrome as a
+  member: My account shows and saves the lists, the meeting page shows "Email…" on a meeting owned by someone else, the dialog has To / CC /
+  Remember, Send delivers to the fake server with cc; no page errors.
+
 ## Explored 2026-10-15 (no code change): Gemma 4 E4B from Qualcomm AI Hub on the NPU through GenieX
 - GenieX CLI v0.8.0 installed without sudo under models/geniex (launcher ~/.local/bin/geniex; it bundles QAIRT 2.45, detects the board as
   Dragonwing IQ-9075); `geniex pull ai-hub-models/Gemma-4-E4B-it --model-hub aihub` (no account or token needed) put the W4A16 bundle (9.7 GB,

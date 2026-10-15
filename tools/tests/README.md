@@ -14,6 +14,7 @@
     .venv/bin/python -W ignore tools/tests/test_phone_mic_ui.py $S $S/silence.wav 9334
     .venv/bin/python -W ignore tools/tests/test_mode_choice.py $S $S/speech.wav 9333   # Start asks live captions / record only
     .venv/bin/python -W ignore tools/tests/test_language.py $S              # meeting language th / th-en / en (needs english.wav, mixed.wav, thai.wav)
+    .venv/bin/python -W ignore tools/tests/test_email_accounts.py $S/scr    # e-mail To / CC per account (copy a finished meeting folder into $S/scr/meetings first)
     tools/tests/scratch_kill.sh && rm -rf $S/scr                           # stop the scratch instance (by its ZECRET_PORT=8445 environment)
 
 The WAV samples are not in the repository (they come from a real meeting). Run the UI tests one at a time: phone checks are

@@ -10,6 +10,7 @@ Rules (enforced by server.require_auth for HTTP and server.ws_user for WebSocket
 - meetings without an owner (made before accounts existed) stay read-only until an admin assigns an eligible owner; an owned
   meeting is never reassigned
 - admin manages accounts, roles and the shared settings/services (vocabulary, word collection, voice library, e-mail, bot, ...)
+- every account keeps its own e-mail recipients (email_to / email_cc, used when that person sends a meeting or owns an auto-sent one)
 """
 from __future__ import annotations
 
@@ -199,6 +200,23 @@ def set_theme(username: str, role: str, theme: str) -> str:
         u[username]["theme"] = theme
         _save_users(u)
     return theme
+
+
+def email_prefs(username: str | None) -> dict:
+    """The account's own e-mail recipients (To / CC), kept in users.json next to the theme."""
+    u = users().get(username or "") or {}
+    return {"to": [str(x) for x in (u.get("email_to") or [])], "cc": [str(x) for x in (u.get("email_cc") or [])]}
+
+
+def set_email_prefs(username: str, to: list[str], cc: list[str]) -> dict:
+    with _lock:
+        u = users()
+        if username not in u:
+            raise KeyError("this account cannot keep recipients")
+        u[username]["email_to"] = list(to)
+        u[username]["email_cc"] = list(cc)
+        _save_users(u)
+    return email_prefs(username)
 
 
 def _admins(u: dict) -> int:

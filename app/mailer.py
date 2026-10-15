@@ -5,6 +5,8 @@
   A password is never sent over an unencrypted connection.
 * Everything that comes from the meeting (title, transcript, AI text) is HTML-escaped; addresses cannot carry header injections.
 * The audio recording is never attached.
+* Recipients: every account keeps its own To / CC lists (auth.email_prefs); the shared "default recipients" in Settings are used
+  by accounts that have none of their own and by the automatic send when the meeting's owner has none.
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ import time
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 
+import auth
 import config
 import store
 
@@ -165,9 +168,27 @@ def _connect(cfg: dict) -> smtplib.SMTP:
     return s
 
 
-def send(to: list[str], subject: str, text: str, html_body: str | None = None, attachments: list[tuple[str, bytes]] | None = None, cfg: dict | None = None):
-    cfg = cfg or load()
+def split_cc(to, cc) -> tuple[list[str], list[str]]:
+    """Validated To and CC lists; an address in both is kept in To only; together at most MAX_TO."""
     to = parse_recipients(to)
+    low = {x.lower() for x in to}
+    cc = [x for x in parse_recipients(cc) if x.lower() not in low]
+    if len(to) + len(cc) > MAX_TO:
+        raise ValueError(f"At most {MAX_TO} recipients (To and CC together).")
+    return to, cc
+
+
+def recipients_for(username: str | None, cfg: dict | None = None) -> tuple[list[str], list[str]]:
+    """The To / CC lists this account sends to: its own, or the shared default recipients when it has no To of its own."""
+    cfg = cfg or load()
+    p = auth.email_prefs(username)
+    return (p["to"] or list(cfg.get("default_to") or [])), p["cc"]
+
+
+def send(to: list[str], subject: str, text: str, html_body: str | None = None, attachments: list[tuple[str, bytes]] | None = None, cfg: dict | None = None,
+         cc: list[str] | None = None):
+    cfg = cfg or load()
+    to, cc = split_cc(to, cc or [])
     if not to:
         raise ValueError("Add at least one recipient.")
     sender = cfg["from_addr"] or cfg["username"]
@@ -177,6 +198,8 @@ def send(to: list[str], subject: str, text: str, html_body: str | None = None, a
     msg["Subject"] = " ".join(subject.split())[:200]          # no line breaks: no header injection
     msg["From"] = formataddr((" ".join((cfg["from_name"] or "Zecrets").split())[:60], sender))
     msg["To"] = ", ".join(to)
+    if cc:
+        msg["Cc"] = ", ".join(cc)
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain=sender.split("@")[-1])
     msg.set_content(text)
@@ -187,7 +210,7 @@ def send(to: list[str], subject: str, text: str, html_body: str | None = None, a
             msg.add_attachment(data, maintype="application", subtype="octet-stream", filename=name)
     s = _connect(cfg)
     try:
-        s.send_message(msg, from_addr=sender, to_addrs=to)
+        s.send_message(msg, from_addr=sender, to_addrs=to + cc)
     finally:
         try:
             s.quit()
@@ -276,19 +299,21 @@ def build_meeting(mid: str, opts: dict | None = None) -> tuple[str, str, str, li
     return f"[Zecrets] {title}", text, h, att
 
 
-def send_meeting(mid: str, to, opts: dict | None = None, auto: bool = False) -> list[str]:
+def send_meeting(mid: str, to, opts: dict | None = None, auto: bool = False, cc=None, by: str | None = None) -> dict:
+    """Mails the meeting; returns {"to": [...], "cc": [...]}. `by` is the account that sent it (None for the automatic send)."""
     cfg = load()
-    rcpt = parse_recipients(to)
+    rcpt, ccs = split_cc(to, cc or [])
     subject, text, h, att = build_meeting(mid, opts)
-    entry = {"time": time.strftime("%F %T"), "to": rcpt, "attachments": [a[0].split("-", 2)[-1] for a in att], "auto": auto}
+    entry = {"time": time.strftime("%F %T"), "to": rcpt, "cc": ccs, "attachments": [a[0].split("-", 2)[-1] for a in att], "auto": auto, "by": by}
     try:
-        send(rcpt, subject, text, h, att, cfg=cfg)
+        send(rcpt, subject, text, h, att, cfg=cfg, cc=ccs)
         entry["ok"] = True
-        return rcpt
+        return {"to": rcpt, "cc": ccs}
     except Exception as e:  # noqa: BLE001
         entry.update(ok=False, error=friendly_error(e, cfg))
         raise
     finally:
         st = store.load_state(mid) or {}
         store.update_state(mid, email_log=((st.get("email_log") or []) + [entry])[-30:])
-        store.log_event(mid, f"e-mail to {len(rcpt)} recipient(s): " + ("sent" if entry["ok"] else "FAILED"))
+        store.log_event(mid, f"e-mail to {len(rcpt)} recipient(s)" + (f" + {len(ccs)} cc" if ccs else "") + (f" by {by}" if by else " (automatic)") + ": "
+                        + ("sent" if entry["ok"] else "FAILED"))

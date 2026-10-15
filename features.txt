@@ -89,7 +89,11 @@ summary-history.json.
 - Notes instructions require evidence for owners/deadlines and
 unspecified labels
    when unsupported. Generated notes still require human review.
-- Email delivery is NOT configured or implemented as part of this work.
+- Email (optional, Settings → Bot, email & network): sends the summary and report
+  through the administrator's SMTP account. Every account keeps its own To and CC
+  (Settings → Accounts → My account); the "Email…" dialog on a meeting shows
+  them, with a CC field and "remember for next time". Members can e-mail any
+  meeting they can read; the automatic send goes to the owner's recipients.
 
 7. ACCOUNTS AND ROLE-BASED ACCESS
 - Local sign-in with Admin, Member and Viewer roles.

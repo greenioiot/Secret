@@ -821,12 +821,16 @@ def auto_email(mid: str):
     import mailer
 
     cfg = mailer.load()
-    if not (cfg["enabled"] and cfg["auto_send"] and cfg["default_to"]):
+    if not (cfg["enabled"] and cfg["auto_send"]):
         return
-    if any(e.get("auto") and e.get("ok") for e in (store.load_state(mid) or {}).get("email_log") or []):
+    st = store.load_state(mid) or {}
+    to, cc = mailer.recipients_for(st.get("owner"), cfg)   # the owner's own recipients, else the shared default ones
+    if not to:
+        return
+    if any(e.get("auto") and e.get("ok") for e in st.get("email_log") or []):
         return  # already sent for this meeting: regenerating the summary does not mail again
     try:
-        mailer.send_meeting(mid, cfg["default_to"], auto=True)
+        mailer.send_meeting(mid, to, auto=True, cc=cc)
     except Exception as e:  # noqa: BLE001 - a mail problem must never fail the processing job
         log.warning("automatic e-mail failed: %s", mailer.friendly_error(e, cfg))
 
